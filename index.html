@@ -118,7 +118,7 @@
       { id: 'ha', labelH: 'は行 (ha)', labelK: 'ハ行 (ha)', chars: [{ h: 'は', k: 'ハ', r: 'ha' }, { h: 'ひ', k: 'ヒ', r: 'hi' }, { h: 'ふ', k: 'フ', r: 'fu' }, { h: 'へ', k: 'ヘ', r: 'he' }, { h: 'ほ', k: 'ホ', r: 'ho' }] },
       { id: 'ma', labelH: 'ま行 (ma)', labelK: 'マ行 (ma)', chars: [{ h: 'ま', k: 'マ', r: 'ma' }, { h: 'み', k: 'ミ', r: 'mi' }, { h: 'む', k: 'ム', r: 'mu' }, { h: 'め', k: 'メ', r: 'me' }, { h: 'も', k: 'モ', r: 'mo' }] },
       { id: 'ya', labelH: 'や行 (ya)', labelK: 'ヤ行 (ya)', chars: [{ h: 'や', k: 'ヤ', r: 'ya' }, { h: 'ゆ', k: 'ユ', r: 'yu' }, { h: 'よ', k: 'ヨ', r: 'yo' }] },
-      { id: 'ra', labelH: 'ら行 (ra)', labelK: 'ラ行 (ra)', chars: [{ h: 'ら', k: 'ラ', r: 'ra' }, { h: 'り', k: 'リ', r: 'ri' }, { h: 'る', k: 'ル', r: 'ru' }, { h: 'れ', k: 'レ', r: 're' }, { h: 'ろ', k: 'ロ', r: 'ro' }] },
+      { id: 'ra', labelH: 'ら行 (ra)', labelK: 'ラ行 (ra)', chars: [{ h: 'ら', k: 'ラ', r: 'ra' }, { h: 'り', k: 'リ', r: 'ri' }, { h: 'る', k: 'ル', r: 'ru' }, { h: 'れ', k: 'レ', r: 're' }, { h: 'ろ', k: '羅', r: 'ro' }] },
       { id: 'wa', labelH: 'わ行 (wa)', labelK: 'ワ行 (wa)', chars: [{ h: 'わ', k: 'ワ', r: 'wa' }, { h: 'を', k: 'ヲ', r: 'wo' }, { h: 'ん', k: 'ン', r: 'n' }] },
       // 濁音與半濁音
       { id: 'ga', labelH: 'が行 (ga) [濁音]', labelK: 'ガ行 (ga) [濁音]', chars: [{ h: 'が', k: 'ガ', r: 'ga' }, { h: 'ぎ', k: 'ギ', r: 'gi' }, { h: 'ぐ', k: 'グ', r: 'gu' }, { h: 'げ', k: 'ゲ', r: 'ge' }, { h: 'ご', k: 'ゴ', r: 'go' }] },
@@ -138,7 +138,7 @@
       { word: 'あさ', meaning: '早上', chars: ['あ', 'さ'] },
       { word: 'あし', meaning: '腳', chars: ['あ', 'し'] },
       { word: 'いす', meaning: '椅子', chars: ['い', 'す'] },
-      { word: 'かさ', meaning: '傘', chars: ['か', 'さ'] },
+      { word: 'kasa', wordH: 'かさ', meaning: '傘', chars: ['か', 'さ'] },
       { word: 'しか', meaning: '鹿', chars: ['し', 'か'] },
       { word: 'うた', meaning: '歌', chars: ['う', 'た'] },
       { word: 'おと', meaning: '聲音', chars: ['お', 'と'] },
@@ -157,10 +157,21 @@
       { word: 'わたし', meaning: '我', chars: ['わ', 'た', 'し'] },
       { word: 'かわ', meaning: '河川', chars: ['か', 'わ'] },
       { word: 'かぎ', meaning: '鑰匙', chars: ['か', 'ぎ'] },
-      { word: 'かぜ', meaning: '風', chars: ['か', 'ぜ'] },
+      { word: 'kaze', wordH: 'かぜ', meaning: '風', chars: ['か', 'ぜ'] },
       { word: 'みず', meaning: '水', chars: ['み', 'ず'] },
       { word: 'でんわ', meaning: '電話', chars: ['で', 'ん', 'わ'] }
-    ];
+    ].map(item => ({ ...item, wordH: item.wordH || item.word }));
+
+    // 將單字自動配對轉換片假名，以利片假名測驗
+    const convertToKatakanaVocab = (hiraganaStr) => {
+      const hToKMap = {};
+      GOJUON_DATA.forEach(row => {
+        row.chars.forEach(c => {
+          hToKMap[c.h] = c.k;
+        });
+      });
+      return hiraganaStr.split('').map(char => hToKMap[char] || char).join('');
+    };
 
     const shuffle = (array) => {
       const arr = [...array];
@@ -331,7 +342,8 @@
           // 播放學習畫面第一張卡的發音
           const firstItem = itemsToLearn[0];
           if (firstItem.word) { // 是單字
-            playAudio(firstItem.word);
+            const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(firstItem.wordH) : firstItem.wordH;
+            playAudio(pronunciation);
           } else { // 是假名
             playAudio(kanaType === 'katakana' ? firstItem.k : firstItem.h);
           }
@@ -344,7 +356,8 @@
         const firstQ = questions[0];
         // 只有單字題且開啟自動朗讀才播放
         if (firstQ.type === 'vocab' && vocabAutoPlay) {
-          playAudio(firstQ.target.word);
+          const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(firstQ.target.wordH) : firstQ.target.wordH;
+          playAudio(pronunciation);
         } else {
           if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         }
@@ -371,7 +384,8 @@
         
         // 作答後一律播放語音加強記憶
         if (currentQ.type === 'vocab') {
-          playAudio(currentQ.target.word);
+          const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(currentQ.target.wordH) : currentQ.target.wordH;
+          playAudio(pronunciation);
         } else {
           playAudio(kanaType === 'katakana' ? currentQ.target.k : currentQ.target.h);
         }
@@ -384,7 +398,8 @@
             
             const nextQ = questions[currentIndex + 1];
             if (nextQ.type === 'vocab' && vocabAutoPlay) {
-              playAudio(nextQ.target.word);
+              const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(nextQ.target.wordH) : nextQ.target.wordH;
+              playAudio(pronunciation);
             }
           } else {
             setScreen('result');
@@ -572,7 +587,7 @@
         const currentItem = learnItems[learnIndex];
         const isVocab = !!currentItem.word; // 判斷這張卡片是否為單字
         
-        const mainText = isVocab ? currentItem.word : (kanaType === 'katakana' ? currentItem.k : currentItem.h);
+        const mainText = isVocab ? (kanaType === 'katakana' ? convertToKatakanaVocab(currentItem.wordH) : currentItem.wordH) : (kanaType === 'katakana' ? currentItem.k : currentItem.h);
         const subText = isVocab ? currentItem.meaning : currentItem.r;
         const rowLabelText = isVocab ? '單字' : (kanaType === 'katakana' ? currentItem.rowLabelK : currentItem.rowLabelH);
 
@@ -581,8 +596,12 @@
             const nextIdx = learnIndex + 1;
             setLearnIndex(nextIdx);
             const nextTarget = learnItems[nextIdx];
-            if (nextTarget.word) playAudio(nextTarget.word);
-            else playAudio(kanaType === 'katakana' ? nextTarget.k : nextTarget.h);
+            if (nextTarget.word) {
+              const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(nextTarget.wordH) : nextTarget.wordH;
+              playAudio(pronunciation);
+            } else {
+              playAudio(kanaType === 'katakana' ? nextTarget.k : nextTarget.h);
+            }
           } else {
             proceedToQuiz();
           }
@@ -593,8 +612,12 @@
             const prevIdx = learnIndex - 1;
             setLearnIndex(prevIdx);
             const prevTarget = learnItems[prevIdx];
-            if (prevTarget.word) playAudio(prevTarget.word);
-            else playAudio(kanaType === 'katakana' ? prevTarget.k : prevTarget.h);
+            if (prevTarget.word) {
+              const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(prevTarget.wordH) : prevTarget.wordH;
+              playAudio(pronunciation);
+            } else {
+              playAudio(kanaType === 'katakana' ? prevTarget.k : prevTarget.h);
+            }
           }
         };
 
@@ -636,7 +659,10 @@
                  </p>
                  
                  <button 
-                   onClick={() => playAudio(isVocab ? currentItem.word : (kanaType === 'katakana' ? currentItem.k : currentItem.h))}
+                   onClick={() => {
+                     const pronunciation = isVocab ? (kanaType === 'katakana' ? convertToKatakanaVocab(currentItem.wordH) : currentItem.wordH) : (kanaType === 'katakana' ? currentItem.k : currentItem.h);
+                     playAudio(pronunciation);
+                   }}
                    className="mt-8 p-4 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors shadow-sm"
                    title="播放發音"
                  >
@@ -698,7 +724,7 @@
         };
 
         const renderOptionText = (opt) => {
-          if (isVocab) return opt.word;
+          if (isVocab) return kanaType === 'katakana' ? convertToKatakanaVocab(opt.wordH) : opt.wordH;
           if (currentQ.format === 'kanaToRomaji') return opt.r;
           return kanaType === 'katakana' ? opt.k : opt.h;
         };
@@ -732,8 +758,12 @@
                 
                 <button 
                   onClick={() => {
-                    if (isVocab) playAudio(currentQ.target.word);
-                    else playAudio(kanaType === 'katakana' ? currentQ.target.k : currentQ.target.h);
+                    if (isVocab) {
+                      const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(currentQ.target.wordH) : currentQ.target.wordH;
+                      playAudio(pronunciation);
+                    } else {
+                      playAudio(kanaType === 'katakana' ? currentQ.target.k : currentQ.target.h);
+                    }
                   }}
                   className={`p-4 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors mt-6 shadow-sm ${!showAudioButton ? 'invisible' : 'visible'}`}
                   title="播放發音"
@@ -837,7 +867,6 @@
       return null;
     }
 
-    // 將 App 元件渲染到畫面上
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
