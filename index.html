@@ -172,6 +172,7 @@
       const [kanaType, setKanaType] = useState('hiragana'); // 'hiragana' | 'katakana'
       const [selectedRows, setSelectedRows] = useState(['a', 'ka']);
       const [quizMode, setQuizMode] = useState('kanaToRomaji'); // 'kanaToRomaji' | 'romajiToKana' | 'vocab'
+      const [vocabAutoPlay, setVocabAutoPlay] = useState(true); // 字彙測驗的自動朗讀開關
 
       const [questions, setQuestions] = useState([]);
       const [currentIndex, setCurrentIndex] = useState(0);
@@ -273,6 +274,11 @@
           setIsAnswered(false);
           setSelectedOption(null);
           setScreen('quiz');
+          
+          // 若為字彙測驗且開啟自動朗讀功能，則開始時即播放語音
+          if (quizMode === 'vocab' && vocabAutoPlay) {
+            playAudio(newQuestions[0].target.word);
+          }
         }
       };
 
@@ -306,6 +312,11 @@
             setCurrentIndex(prev => prev + 1);
             setIsAnswered(false);
             setSelectedOption(null);
+            
+            // 切換下一題時，若為字彙測驗且開啟自動朗讀，則播放語音
+            if (quizMode === 'vocab' && vocabAutoPlay) {
+              playAudio(questions[currentIndex + 1].target.word);
+            }
           } else {
             setScreen('result');
           }
@@ -446,13 +457,34 @@
                     <input type="radio" name="mode" className="w-5 h-5 text-indigo-600 mr-4" checked={quizMode === 'romajiToKana'} onChange={() => setQuizMode('romajiToKana')} />
                     <span className="font-bold text-slate-700">看發音，選正確假名</span>
                   </label>
-                  <label className="flex items-center p-4 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                    <input type="radio" name="mode" className="w-5 h-5 text-indigo-600 mr-4" checked={quizMode === 'vocab'} onChange={() => setQuizMode('vocab')} />
-                    <div className="flex flex-col">
+                  
+                  {/* 字彙測驗與自動朗讀功能區塊 */}
+                  <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-colors ${quizMode === 'vocab' ? 'bg-indigo-50/50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'}`}>
+                    <div className="mt-1">
+                      <input type="radio" name="mode" className="w-5 h-5 text-indigo-600 mr-4" checked={quizMode === 'vocab'} onChange={() => setQuizMode('vocab')} />
+                    </div>
+                    <div className="flex flex-col w-full">
                       <span className="font-bold text-slate-700">字彙測驗 (依所選範圍)</span>
                       <span className="text-sm text-slate-500 mt-1">
                         目前可用單字數：{availableVocab.length} 題
                       </span>
+                      {/* 當選取字彙測驗時，顯示自動朗讀開關 */}
+                      {quizMode === 'vocab' && (
+                        <div 
+                          className="mt-3 flex items-center"
+                          onClick={(e) => e.stopPropagation()} /* 防止點擊開關時觸發上層 radio 的切換效果 */
+                        >
+                          <label className="flex items-center p-2.5 bg-indigo-100/70 rounded-lg cursor-pointer hover:bg-indigo-200/60 transition-colors">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4 text-indigo-600 rounded border-slate-300 mr-2" 
+                              checked={vocabAutoPlay} 
+                              onChange={(e) => setVocabAutoPlay(e.target.checked)} 
+                            />
+                            <span className="text-sm font-bold text-indigo-800">自動朗讀題目 (聽力測驗模式)</span>
+                          </label>
+                        </div>
+                      )}
                     </div>
                   </label>
                 </div>
@@ -505,6 +537,9 @@
           return kanaType === 'katakana' ? opt.k : opt.h;
         };
 
+        // 決定是否要顯示語音播放按鈕 (已作答必定顯示；如果開啟了字彙的自動朗讀，則未作答時也會顯示)
+        const showAudioButton = isAnswered || (quizMode === 'vocab' && vocabAutoPlay);
+
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-lg">
@@ -535,7 +570,7 @@
                     if (quizMode === 'vocab') playAudio(currentQ.target.word);
                     else playAudio(kanaType === 'katakana' ? currentQ.target.k : currentQ.target.h);
                   }}
-                  className={`p-4 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors mt-6 shadow-sm ${!isAnswered ? 'invisible' : 'visible'}`}
+                  className={`p-4 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors mt-6 shadow-sm ${!showAudioButton ? 'invisible' : 'visible'}`}
                   title="播放發音"
                 >
                   <Volume2 className="w-7 h-7" />
