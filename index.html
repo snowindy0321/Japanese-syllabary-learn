@@ -118,16 +118,17 @@
       { id: 'ha', labelH: 'は行 (ha)', labelK: 'ハ行 (ha)', chars: [{ h: 'は', k: 'ハ', r: 'ha' }, { h: 'ひ', k: 'ヒ', r: 'hi' }, { h: 'ふ', k: 'フ', r: 'fu' }, { h: 'へ', k: 'ヘ', r: 'he' }, { h: 'ほ', k: 'ホ', r: 'ho' }] },
       { id: 'ma', labelH: 'ま行 (ma)', labelK: 'マ行 (ma)', chars: [{ h: 'ま', k: 'マ', r: 'ma' }, { h: 'み', k: 'ミ', r: 'mi' }, { h: 'む', k: 'ム', r: 'mu' }, { h: 'め', k: 'メ', r: 'me' }, { h: 'も', k: 'モ', r: 'mo' }] },
       { id: 'ya', labelH: 'や行 (ya)', labelK: 'ヤ行 (ya)', chars: [{ h: 'や', k: 'ヤ', r: 'ya' }, { h: 'ゆ', k: 'ユ', r: 'yu' }, { h: 'よ', k: 'ヨ', r: 'yo' }] },
-      { id: 'ra', labelH: 'ら行 (ra)', labelK: 'ラ行 (ra)', chars: [{ h: 'ら', k: 'ラ', r: 'ra' }, { h: 'り', k: 'リ', r: 'ri' }, { h: 'る', k: 'ル', r: 'ru' }, { h: 'れ', k: 'レ', r: 're' }, { h: 'ろ', k: '羅', r: 'ro' }] },
+      { id: 'ra', labelH: 'ら行 (ra)', labelK: 'ラ行 (ra)', chars: [{ h: 'ら', k: 'ラ', r: 'ra' }, { h: 'り', k: 'リ', r: 'ri' }, { h: 'る', k: 'ル', r: 'ru' }, { h: 'れ', k: 'レ', r: 're' }, { h: 'ろ', k: 'ロ', r: 'ro' }] },
       { id: 'wa', labelH: 'わ行 (wa)', labelK: 'ワ行 (wa)', chars: [{ h: 'わ', k: 'ワ', r: 'wa' }, { h: 'を', k: 'ヲ', r: 'wo' }, { h: 'ん', k: 'ン', r: 'n' }] },
       // 濁音與半濁音
       { id: 'ga', labelH: 'が行 (ga) [濁音]', labelK: 'ガ行 (ga) [濁音]', chars: [{ h: 'が', k: 'ガ', r: 'ga' }, { h: 'ぎ', k: 'ギ', r: 'gi' }, { h: 'ぐ', k: 'グ', r: 'gu' }, { h: 'げ', k: 'ゲ', r: 'ge' }, { h: 'ご', k: 'ゴ', r: 'go' }] },
       { id: 'za', labelH: 'ざ行 (za) [濁音]', labelK: 'ザ行 (za) [濁音]', chars: [{ h: 'ざ', k: 'ザ', r: 'za' }, { h: 'じ', k: 'ジ', r: 'ji' }, { h: 'ず', k: 'ズ', r: 'zu' }, { h: 'ぜ', k: 'ゼ', r: 'ze' }, { h: 'ぞ', k: 'ゾ', r: 'zo' }] },
       { id: 'da', labelH: 'だ行 (da) [濁音]', labelK: 'ダ行 (da) [濁音]', chars: [{ h: 'だ', k: 'ダ', r: 'da' }, { h: 'ぢ', k: 'ヂ', r: 'ji' }, { h: 'づ', k: 'ヅ', r: 'zu' }, { h: 'で', k: 'デ', r: 'de' }, { h: 'ど', k: 'ド', r: 'do' }] },
       { id: 'ba', labelH: 'ば行 (ba) [濁音]', labelK: 'バ行 (ba) [濁音]', chars: [{ h: 'ば', k: 'バ', r: 'ba' }, { h: 'び', k: 'ビ', r: 'bi' }, { h: 'ぶ', k: 'ブ', r: 'bu' }, { h: 'べ', k: 'ベ', r: 'be' }, { h: 'ぼ', k: 'ボ', r: 'bo' }] },
-      { id: 'pa', labelH: 'ぱ行 (pa) [半濁音]', labelK: 'パ行 (pa) [半濁音]', chars: [{ h: 'ぱ', k: 'パ', r: 'pa' }, { h: 'ぴ', k: 'ピ', r: 'pi' }, { h: 'ぷ', k: 'プ', r: 'pu' }, { h: 'ぺ', k: '配', r: 'pe' }, { h: 'ぽ', k: 'ポ', r: 'po' }] },
+      { id: 'pa', labelH: 'ぱ行 (pa) [半濁音]', labelK: 'パ行 (pa) [半濁音]', chars: [{ h: 'ぱ', k: 'パ', r: 'pa' }, { h: 'ぴ', k: 'ピ', r: 'pi' }, { h: 'ぷ', k: 'プ', r: 'pu' }, { h: 'ぺ', k: 'ペ', r: 'pe' }, { h: 'ぽ', k: 'ポ', r: 'po' }] },
     ];
 
+    // 修正了部份拼寫錯誤的資料，讓程式能穩健執行
     const VOCAB_LIST = [
       { word: 'あい', meaning: '愛', chars: ['あ', 'い'] },
       { word: 'いえ', meaning: '房子', chars: ['い', 'え'] },
@@ -138,13 +139,13 @@
       { word: 'あさ', meaning: '早上', chars: ['あ', 'さ'] },
       { word: 'あし', meaning: '腳', chars: ['あ', 'し'] },
       { word: 'いす', meaning: '椅子', chars: ['い', 'す'] },
-      { word: 'kasa', wordH: 'かさ', meaning: '傘', chars: ['か', 'さ'] },
+      { word: 'かさ', meaning: '傘', chars: ['か', 'さ'] },
       { word: 'しか', meaning: '鹿', chars: ['し', 'か'] },
       { word: 'うた', meaning: '歌', chars: ['う', 'た'] },
       { word: 'おと', meaning: '聲音', chars: ['お', 'と'] },
       { word: 'なに', meaning: '什麼', chars: ['な', 'に'] },
       { word: 'いぬ', meaning: '狗', chars: ['い', 'ぬ'] },
-      { word: 'ねこ', meaning: '貓', chars: ['ne', 'こ'] },
+      { word: 'ねこ', meaning: '貓', chars: ['ね', 'こ'] },
       { word: 'はな', meaning: '花', chars: ['は', 'な'] },
       { word: 'ふね', meaning: '船', chars: ['ふ', 'ね'] },
       { word: 'ほし', meaning: '星星', chars: ['ほ', 'し'] },
@@ -157,13 +158,23 @@
       { word: 'わたし', meaning: '我', chars: ['わ', 'た', 'し'] },
       { word: 'かわ', meaning: '河川', chars: ['か', 'わ'] },
       { word: 'かぎ', meaning: '鑰匙', chars: ['か', 'ぎ'] },
-      { word: 'kaze', wordH: 'かぜ', meaning: '風', chars: ['か', 'ぜ'] },
+      { word: 'かぜ', meaning: '風', chars: ['か', 'ぜ'] },
       { word: 'みず', meaning: '水', chars: ['み', 'ず'] },
       { word: 'でんわ', meaning: '電話', chars: ['で', 'ん', 'わ'] }
     ].map(item => ({ ...item, wordH: item.wordH || item.word }));
 
+    const shuffle = (array) => {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+
     // 將單字自動配對轉換片假名，以利片假名測驗
     const convertToKatakanaVocab = (hiraganaStr) => {
+      if (!hiraganaStr) return '';
       const hToKMap = {};
       GOJUON_DATA.forEach(row => {
         row.chars.forEach(c => {
@@ -188,22 +199,21 @@
       const [quizModes, setQuizModes] = useState(['kanaToRomaji']); // 支援複選
       const [vocabAutoPlay, setVocabAutoPlay] = useState(true);
 
-      // 行與關卡追蹤狀態
-      const [currentRowIndex, setCurrentRowIndex] = useState(0); // 目前正練習 selectedRows 中的第幾個行
-      const [rowResults, setRowResults] = useState([]); // 紀錄每一行的成績：[{ label, score, total }]
+      const [currentRowIndex, setCurrentRowIndex] = useState(0); 
+      const [rowResults, setRowResults] = useState([]); 
       
-      // 當前單行測驗與學習資料
       const [questions, setQuestions] = useState([]);      
       const [learnItems, setLearnItems] = useState([]);    
       const [learnIndex, setLearnIndex] = useState(0);     
       const [currentIndex, setCurrentIndex] = useState(0); 
-      const [score, setScore] = useState(0); // 總正確題數累積
-      const [rowScore, setRowScore] = useState(0); // 當前行正確題數
+      const [score, setScore] = useState(0); 
+      const [rowScore, setRowScore] = useState(0); 
       const [isAnswered, setIsAnswered] = useState(false);
       const [selectedOption, setSelectedOption] = useState(null);
 
-      // 播放語音
+      // 播放語音機制
       const playAudio = useCallback((text) => {
+        if (!text) return;
         if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel();
           const utterance = new SpeechSynthesisUtterance(text);
@@ -273,16 +283,14 @@
 
         // 1. 如果勾選了五十音發音相關的測驗
         if (hasCharMode) {
-          // 學習字卡加入該行的假名 (依五十音原始順序排列)
           itemsToLearn.push(...charPool);
           
-          // 混淆選項產生器 (優先挑選同行的假名)
           const getDistractors = (target) => {
             let sameRowChars = charPool.filter(c => c.r !== target.r);
-            let otherRowsChars = GOJUON_DATA.flatMap(r => r.chars).filter(c => c.r !== target.r);
+            // 使用 reduce 取代 flatMap 以確保舊版瀏覽器或 WebView 能正常運作
+            let otherRowsChars = GOJUON_DATA.reduce((acc, r) => acc.concat(r.chars), []).filter(c => c.r !== target.r);
             let distractors = [];
             
-            // 盡可能從同行挑選混淆選項
             distractors.push(...shuffle(sameRowChars).slice(0, 3));
             if (distractors.length < 3) {
               distractors.push(...shuffle(otherRowsChars).slice(0, 3 - distractors.length));
@@ -290,7 +298,6 @@
             return distractors;
           };
 
-          // 產生「看假名選發音」
           if (quizModes.includes('kanaToRomaji')) {
             newQuestions.push(...charPool.map(target => {
               const distractors = getDistractors(target);
@@ -298,7 +305,6 @@
             }));
           }
           
-          // 產生「看發音選假名」
           if (quizModes.includes('romajiToKana')) {
             newQuestions.push(...charPool.map(target => {
               const distractors = getDistractors(target);
@@ -309,14 +315,12 @@
 
         // 2. 如果有勾選單字測驗
         if (quizModes.includes('vocab')) {
-          // 篩選與該行相關的單字 (包含當前行假名，且其餘假名皆在已勾選的範圍內)
           const rowRelatedVocab = VOCAB_LIST.filter(vocab => {
             const hasActiveRowChar = vocab.chars.some(char => kanaToRowMap[char] === activeRowId);
             const allCharsInSelected = vocab.chars.every(char => selectedRows.includes(kanaToRowMap[char]));
             return hasActiveRowChar && allCharsInSelected;
           });
 
-          // 取最多 5 個單字練習，避免單行學習負擔過重
           const shuffledVocab = shuffle(rowRelatedVocab).slice(0, 5);
           
           if (shuffledVocab.length > 0) {
@@ -342,7 +346,6 @@
           return;
         }
 
-        // 題目打亂、學習順序照常
         setQuestions(shuffle(newQuestions)); 
         setLearnItems(itemsToLearn);
         
@@ -354,17 +357,18 @@
         
         setScreen('learn');
         
-        // 播放第一個學習卡的發音
+        // 安全地播放第一個學習卡的發音
         const firstItem = itemsToLearn[0];
-        if (firstItem.word) {
-          const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(firstItem.wordH) : firstItem.wordH;
-          playAudio(pronunciation);
-        } else {
-          playAudio(kanaType === 'katakana' ? firstItem.k : firstItem.h);
+        if (firstItem) {
+          if (firstItem.word) {
+            const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(firstItem.wordH) : firstItem.wordH;
+            playAudio(pronunciation);
+          } else {
+            playAudio(kanaType === 'katakana' ? firstItem.k : firstItem.h);
+          }
         }
       };
 
-      // 總啟動點
       const startQuiz = () => {
         if (selectedRows.length === 0 || quizModes.length === 0) return;
         setRowResults([]);
@@ -376,7 +380,7 @@
       const proceedToQuiz = () => {
         setScreen('quiz');
         const firstQ = questions[0];
-        if (firstQ.type === 'vocab' && vocabAutoPlay) {
+        if (firstQ && firstQ.type === 'vocab' && vocabAutoPlay) {
           const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(firstQ.target.wordH) : firstQ.target.wordH;
           playAudio(pronunciation);
         } else {
@@ -391,6 +395,8 @@
         setSelectedOption(option);
         
         const currentQ = questions[currentIndex];
+        if (!currentQ) return;
+
         let isCorrect = false;
 
         if (currentQ.type === 'vocab') {
@@ -418,12 +424,11 @@
             setSelectedOption(null);
             
             const nextQ = questions[currentIndex + 1];
-            if (nextQ.type === 'vocab' && vocabAutoPlay) {
+            if (nextQ && nextQ.type === 'vocab' && vocabAutoPlay) {
               const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(nextQ.target.wordH) : nextQ.target.wordH;
               playAudio(pronunciation);
             }
           } else {
-            // 當前行答題完成，結算當前行並進入轉場畫面
             const activeRowId = selectedRows[currentRowIndex];
             const rowData = GOJUON_DATA.find(r => r.id === activeRowId);
             const rowLabel = kanaType === 'katakana' ? rowData.labelK : rowData.labelH;
@@ -450,7 +455,6 @@
         }
       };
 
-      // 1. 首頁畫面 (Home)
       if (screen === 'home') {
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 md:p-8">
@@ -505,9 +509,11 @@
         );
       }
 
-      // 2. 設定畫面 (Setup)
       if (screen === 'setup') {
-        const isStartDisabled = selectedRows.length === 0 || quizModes.length === 0;
+        const hasCharMode = quizModes.includes('kanaToRomaji') || quizModes.includes('romajiToKana');
+        // 防止出現：只有勾選字彙，但可用字彙為 0 的死胡同
+        const isStartDisabled = selectedRows.length === 0 || quizModes.length === 0 || (!hasCharMode && availableVocab.length === 0);
+        
         return (
           <div className="min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8">
             <div className="max-w-3xl mx-auto space-y-6">
@@ -623,8 +629,8 @@
         );
       }
 
-      // 3. 學習畫面 (Learn) - 單行循序學習
       if (screen === 'learn') {
+        if (!learnItems || !learnItems[learnIndex]) return null;
         const currentItem = learnItems[learnIndex];
         const isVocab = !!currentItem.word;
         
@@ -739,8 +745,8 @@
         );
       }
 
-      // 4. 測驗畫面 (Quiz) - 題目限定當前行並完全打亂
       if (screen === 'quiz') {
+        if (!questions || !questions[currentIndex]) return null;
         const currentQ = questions[currentIndex];
         const isVocab = currentQ.type === 'vocab';
         
@@ -866,7 +872,7 @@
         );
       }
 
-      // 5. 轉場畫面 (Transition) - 單行成績結算，準備進入下一行
+      // 5. 轉場畫面 (Transition) - 單行成績結算
       if (screen === 'transition') {
         const lastResult = rowResults[rowResults.length - 1];
         const nextIndex = currentRowIndex + 1;
@@ -875,12 +881,11 @@
         const nextRowData = hasNext ? GOJUON_DATA.find(r => r.id === nextRowId) : null;
         const nextRowLabel = nextRowData ? (kanaType === 'katakana' ? nextRowData.labelK : nextRowData.labelH) : '';
 
-        // 行內評語
         const scorePercentage = lastResult ? (lastResult.score / lastResult.total) : 0;
         let evaluation = "加油！多複習幾次就會更熟練囉！🌟";
         if (scorePercentage === 1) evaluation = "太厲害了！完美全對！💯";
         else if (scorePercentage >= 0.8) evaluation = "表現優異！手感火熱喔！🔥";
-        else if (scorePercentage >= 0.6) evaluation = "表現不錯！合格囉！👍";
+        else if (scorePercentage >= 0.6) evaluation = "表現不錯！及格囉！👍";
 
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -907,7 +912,7 @@
                 {hasNext ? (
                   <>進入下一行：{nextRowLabel} <ArrowRight className="ml-2 w-5 h-5" /></>
                 ) : (
-                  <>查看最終成果 <ArrowRight className="ml-2 w-5 h-5" /></>
+                  <>查看最終總成果 <ArrowRight className="ml-2 w-5 h-5" /></>
                 )}
               </button>
             </div>
@@ -915,7 +920,7 @@
         );
       }
 
-      // 6. 總結果畫面 (Result) - 列出每一行的詳細成績
+      // 6. 總結果畫面 (Result)
       if (screen === 'result') {
         const totalCorrect = rowResults.reduce((acc, r) => acc + r.score, 0);
         const totalQuestions = rowResults.reduce((acc, r) => acc + r.total, 0);
@@ -932,7 +937,6 @@
                 <span className="text-5xl font-black">{percentage}%</span>
               </div>
 
-              {/* 各行詳細成績清單 */}
               <div className="space-y-3 max-h-60 overflow-y-auto border border-slate-100 rounded-2xl p-4 bg-slate-50/50 mb-8">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-left mb-1">各行學習成績單</p>
                 {rowResults.map((res, idx) => (
