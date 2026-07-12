@@ -19,7 +19,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useCallback, useMemo, useEffect, useRef } = React;
+    const { useState, useCallback, useMemo, useEffect } = React;
 
     // --- Inline SVG 元件 ---
     const Volume2 = ({ className }) => (
@@ -128,7 +128,6 @@
       { id: 'ya', labelH: 'や行 (ya)', labelK: 'ヤ行 (ya)', chars: [{ h: 'や', k: 'ヤ', r: 'ya' }, { h: 'ゆ', k: 'ユ', r: 'yu' }, { h: 'よ', k: 'ヨ', r: 'yo' }] },
       { id: 'ra', labelH: 'ら行 (ra)', labelK: 'ラ行 (ra)', chars: [{ h: 'ら', k: 'ラ', r: 'ra' }, { h: 'り', k: 'リ', r: 'ri' }, { h: 'る', k: 'ル', r: 'ru' }, { h: 'れ', k: 'レ', r: 're' }, { h: 'ろ', k: 'ロ', r: 'ro' }] },
       { id: 'wa', labelH: 'わ行 (wa)', labelK: 'ワ行 (wa)', chars: [{ h: 'わ', k: 'ワ', r: 'wa' }, { h: 'を', k: 'ヲ', r: 'wo' }, { h: 'ん', k: 'ン', r: 'n' }] },
-      // 濁音與半濁音
       { id: 'ga', labelH: 'が行 (ga) [濁音]', labelK: 'ガ行 (ga) [濁音]', chars: [{ h: 'が', k: 'ガ', r: 'ga' }, { h: 'ぎ', k: 'ギ', r: 'gi' }, { h: 'ぐ', k: 'グ', r: 'gu' }, { h: 'げ', k: 'ゲ', r: 'ge' }, { h: 'ご', k: 'ゴ', r: 'go' }] },
       { id: 'za', labelH: 'ざ行 (za) [濁音]', labelK: 'ザ行 (za) [濁音]', chars: [{ h: 'ざ', k: 'ザ', r: 'za' }, { h: 'じ', k: 'ジ', r: 'ji' }, { h: 'ず', k: 'ズ', r: 'zu' }, { h: 'ぜ', k: 'ゼ', r: 'ze' }, { h: 'ぞ', k: 'ゾ', r: 'zo' }] },
       { id: 'da', labelH: 'だ行 (da) [濁音]', labelK: 'ダ行 (da) [濁音]', chars: [{ h: 'だ', k: 'ダ', r: 'da' }, { h: 'ぢ', k: 'ヂ', r: 'ji' }, { h: 'づ', k: 'ヅ', r: 'zu' }, { h: 'で', k: 'デ', r: 'de' }, { h: 'ど', k: 'ド', r: 'do' }] },
@@ -184,9 +183,7 @@
       if (!hiraganaStr) return '';
       const hToKMap = {};
       GOJUON_DATA.forEach(row => {
-        row.chars.forEach(c => {
-          hToKMap[c.h] = c.k;
-        });
+        row.chars.forEach(c => { hToKMap[c.h] = c.k; });
       });
       return hiraganaStr.split('').map(char => hToKMap[char] || char).join('');
     };
@@ -199,13 +196,34 @@
       });
     });
 
+    // 手機離線 TTS 備援方案
+    const playLocalTTS = (text) => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ja-JP'; 
+        utterance.rate = 0.85; 
+        
+        const voices = window.speechSynthesis.getVoices();
+        const jaVoices = voices.filter(v => v.lang.includes('ja') || v.lang.includes('JP') || v.name.includes('日'));
+        
+        if (jaVoices.length > 0) {
+          const googleVoice = jaVoices.find(v => v.name.includes('Google'));
+          utterance.voice = googleVoice || jaVoices[0];
+        }
+        window.speechSynthesis.speak(utterance);
+      }
+    };
+
     function App() {
       const [screen, setScreen] = useState('home'); 
       const [kanaType, setKanaType] = useState('hiragana'); 
       const [selectedRows, setSelectedRows] = useState(['a', 'ka']);
       const [quizModes, setQuizModes] = useState(['kanaToRomaji']); 
       const [vocabAutoPlay, setVocabAutoPlay] = useState(true);
-      const [useNetworkVoice, setUseNetworkVoice] = useState(true); // 新增：是否使用網路語音
+      
+      // 控制是否使用網路語音
+      const [useNetworkTTS, setUseNetworkTTS] = useState(true);
 
       const [currentRowIndex, setCurrentRowIndex] = useState(0); 
       const [rowResults, setRowResults] = useState([]); 
@@ -219,15 +237,9 @@
       const [isAnswered, setIsAnswered] = useState(false);
       const [selectedOption, setSelectedOption] = useState(null);
 
-      // 用於網路發音的 Audio 實體參考
-      const audioRef = useRef(null);
-
-      // 預先載入系統語音包 (保留給離線模式使用)
       useEffect(() => {
         const initVoices = () => {
-          if ('speechSynthesis' in window) {
-            window.speechSynthesis.getVoices();
-          }
+          if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
         };
         initVoices();
         if ('speechSynthesis' in window) {
@@ -235,67 +247,24 @@
         }
       }, []);
 
-      // 統一停止所有聲音
-      const stopAllAudio = useCallback(() => {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-        }
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
-        }
-      }, []);
-
-      // 播放語音機制：依據設定選擇網路語音(高音質/防雷) 或 離線語音
+      // 全新的播放音訊邏輯 (完美解決 Android 手機中文怪音)
       const playAudio = useCallback((text) => {
         if (!text) return;
-        
-        // 移除可能干擾朗讀的標點符號
-        const cleanText = text.replace(/[、。！？]/g, '');
 
-        // 1. 如果啟用網路發音 (透過 Google Translate TTS API)
-        if (useNetworkVoice) {
-          if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-          }
-          // 透過設定 tl=ja 明確指定使用日文引擎，徹底解決 Android 手機發音怪異問題
-          audioRef.current = new Audio(`https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=ja&q=${encodeURIComponent(cleanText)}`);
-          audioRef.current.playbackRate = 0.9;
-          audioRef.current.play().catch(e => {
-            console.log("網路語音播放失敗，自動切換至本地發音", e);
-            playLocalTTS(cleanText);
+        if (useNetworkTTS) {
+          // 呼叫 Google 翻譯的開放網路語音，確保 100% 正確日文發音
+          const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ja&q=${encodeURIComponent(text)}`;
+          const audio = new Audio(url);
+          
+          audio.play().catch(err => {
+            console.warn("網路語音播放失敗，自動退回本地語音", err);
+            playLocalTTS(text); // 網路不通時自動切換回原本的語音引擎
           });
-          return;
+        } else {
+          // 強制使用手機內建語音 (離線備用)
+          playLocalTTS(text);
         }
-
-        // 2. 如果未啟用網路，則使用本地發音
-        playLocalTTS(cleanText);
-      }, [useNetworkVoice]);
-
-      const playLocalTTS = (text) => {
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.lang = 'ja-JP'; 
-          utterance.rate = 0.85; 
-          
-          const voices = window.speechSynthesis.getVoices();
-          const jaVoices = voices.filter(voice => 
-            voice.lang === 'ja-JP' || 
-            voice.lang === 'ja_JP' || 
-            voice.lang.includes('ja-') ||
-            voice.name.toLowerCase().includes('japan')
-          );
-          
-          if (jaVoices.length > 0) {
-            const googleVoice = jaVoices.find(v => v.name.includes('Google'));
-            utterance.voice = googleVoice || jaVoices[0];
-          }
-
-          window.speechSynthesis.speak(utterance);
-        }
-      };
+      }, [useNetworkTTS]);
 
       const availableVocab = useMemo(() => {
         if (selectedRows.length === 0) return [];
@@ -319,7 +288,6 @@
         const targetIds = isSeion ? seionIds : dakuonIds;
         
         const allIncluded = targetIds.every(id => selectedRows.includes(id));
-        
         if (allIncluded) {
           setSelectedRows(prev => prev.filter(id => !targetIds.includes(id)));
         } else {
@@ -333,7 +301,6 @@
         );
       };
 
-      // 檢查是否能開始測驗 (防呆機制)
       const isStartDisabled = useMemo(() => {
         if (selectedRows.length === 0) return true;
         const hasKanaMode = quizModes.includes('kanaToRomaji') || quizModes.includes('romajiToKana');
@@ -358,7 +325,6 @@
         return false;
       }, [selectedRows, quizModes]);
 
-      // 建立假名選項 
       const createKanaQuestion = (target, fullPool, mode) => {
         let sameRowChars = fullPool.filter(c => c.rowId === target.rowId && c.r !== target.r);
         let otherRowsChars = fullPool.filter(c => c.rowId !== target.rowId);
@@ -485,7 +451,7 @@
           const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(firstQ.target.wordH) : firstQ.target.wordH;
           playAudio(pronunciation);
         } else {
-          stopAllAudio();
+          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         }
       };
 
@@ -556,6 +522,8 @@
         }
       };
 
+      // === 以下為畫面渲染 ===
+
       if (screen === 'home') {
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 md:p-8">
@@ -594,8 +562,8 @@
                   <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
                     <Headphones className="w-6 h-6" />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">網路高音質發音</h3>
-                  <p className="text-slate-500">搭載高音質網路語音引擎，徹底解決手機瀏覽器發音怪異或無聲的問題，聆聽最標準口音。</p>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">標準日文語音</h3>
+                  <p className="text-slate-500">搭載網路高音質日語語音引擎，完全解決手機發音錯誤的問題，落實聽力自我檢測。</p>
                 </div>
               </div>
 
@@ -641,7 +609,38 @@
               </div>
 
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                <h2 className="text-lg font-bold mb-4">2. 選擇學習與測驗範圍 <span className="text-sm font-normal text-slate-400 ml-2">(系統將逐行帶您練習)</span></h2>
+                <h2 className="text-lg font-bold mb-4">2. 選擇語音引擎 <span className="text-sm font-normal text-slate-400 ml-2">(聽聽看哪個順耳)</span></h2>
+                <div className="flex flex-col space-y-3">
+                  <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-colors ${useNetworkTTS ? 'bg-indigo-50/50 border-indigo-300' : 'border-slate-200 hover:bg-slate-50'}`}>
+                    <div className="mt-1">
+                      <input type="radio" name="ttsMode" className="w-5 h-5 text-indigo-600 mr-4" checked={useNetworkTTS} onChange={() => setUseNetworkTTS(true)} />
+                    </div>
+                    <div className="flex flex-col w-full">
+                      <span className="font-bold text-slate-700">網路高音質語音 (強烈推薦)</span>
+                      <span className="text-sm text-slate-500 mt-1">發音標準，完美解決安卓手機念成怪音的問題（需保持網路連線）。</span>
+                    </div>
+                  </label>
+                  <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-colors ${!useNetworkTTS ? 'bg-indigo-50/50 border-indigo-300' : 'border-slate-200 hover:bg-slate-50'}`}>
+                    <div className="mt-1">
+                      <input type="radio" name="ttsMode" className="w-5 h-5 text-indigo-600 mr-4" checked={!useNetworkTTS} onChange={() => setUseNetworkTTS(false)} />
+                    </div>
+                    <div className="flex flex-col w-full">
+                      <span className="font-bold text-slate-700">手機內建語音 (離線備用)</span>
+                      <span className="text-sm text-slate-500 mt-1">無需網路，但部分安卓手機會將單一假名念成「頓」或奇怪口音。</span>
+                    </div>
+                  </label>
+                  
+                  <button 
+                    onClick={() => playAudio('え')} 
+                    className="mt-3 w-max flex items-center bg-slate-100 hover:bg-indigo-100 text-indigo-700 font-bold py-2 px-5 rounded-lg transition-colors border border-slate-200"
+                  >
+                    <Volume2 className="w-5 h-5 mr-2" /> 點擊測試發音 (測試「え」的聲音)
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                <h2 className="text-lg font-bold mb-4">3. 選擇學習與測驗範圍 <span className="text-sm font-normal text-slate-400 ml-2">(系統將逐行帶您練習)</span></h2>
                 
                 <div className="mb-4 flex gap-4">
                   <button 
@@ -676,7 +675,7 @@
               </div>
 
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                <h2 className="text-lg font-bold mb-4">3. 選擇測驗題型 <span className="text-sm font-normal text-slate-400 ml-2">(可複選，每行獨立考驗)</span></h2>
+                <h2 className="text-lg font-bold mb-4">4. 選擇測驗題型 <span className="text-sm font-normal text-slate-400 ml-2">(可複選，每行獨立考驗)</span></h2>
                 <div className="flex flex-col space-y-3">
                   <label className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-colors ${quizModes.includes('kanaToRomaji') ? 'bg-indigo-50/50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'}`}>
                     <input type="checkbox" className="w-5 h-5 text-indigo-600 rounded border-slate-300 mr-4" checked={quizModes.includes('kanaToRomaji')} onChange={() => handleToggleQuizMode('kanaToRomaji')} />
@@ -712,21 +711,6 @@
                     </div>
                   </label>
                 </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                <h2 className="text-lg font-bold mb-4">4. 語音引擎設定</h2>
-                <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-colors ${useNetworkVoice ? 'bg-indigo-50/50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'}`}>
-                  <div className="mt-1">
-                    <input type="checkbox" className="w-5 h-5 text-indigo-600 rounded border-slate-300 mr-4" checked={useNetworkVoice} onChange={() => setUseNetworkVoice(!useNetworkVoice)} />
-                  </div>
-                  <div className="flex flex-col w-full">
-                    <span className="font-bold text-slate-700">啟用高音質網路發音 (強烈推薦)</span>
-                    <span className="text-sm text-slate-500 mt-1 leading-relaxed">
-                      若您的手機會發出奇怪的怪聲、讀成中文或完全沒有聲音，請保持此選項開啟以使用標準日文發音。（需連線網路）
-                    </span>
-                  </div>
-                </label>
               </div>
 
               <button
@@ -779,7 +763,7 @@
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-lg">
-              <div className="flex gap-1.5 justify-center mb-4">
+              <div className="flex gap-1.5 justify-center mb-4 flex-wrap">
                 {selectedRows.map((rowId, idx) => {
                   const rData = GOJUON_DATA.find(r => r.id === rowId);
                   const isActive = idx === currentRowIndex;
@@ -797,7 +781,7 @@
               <div className="flex justify-between items-center mb-6 px-2">
                 <button 
                   onClick={() => {
-                    stopAllAudio();
+                    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
                     setScreen('setup');
                   }}
                   className="flex items-center justify-center p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
@@ -816,7 +800,7 @@
                 </button>
               </div>
 
-              <div className="bg-white rounded-[2rem] shadow-xl p-10 md:p-14 mb-8 border border-slate-100 flex flex-col items-center relative text-center transition-all">
+              <div className="bg-white rounded-[2rem] shadow-xl p-10 md:p-14 mb-8 border border-slate-100 flex flex-col items-center relative text-center">
                  <p className="text-sm text-indigo-600 mb-4 font-bold tracking-widest bg-indigo-50 px-4 py-1 rounded-full">
                    — {rowLabelText} 學習 —
                  </p>
@@ -918,7 +902,7 @@
               <div className="flex justify-between items-center mb-6 px-2">
                 <button 
                   onClick={() => {
-                    stopAllAudio();
+                    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
                     setScreen('setup'); 
                   }}
                   className="flex items-center justify-center p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
@@ -1092,19 +1076,13 @@
 
               <div className="flex gap-4">
                 <button
-                  onClick={() => {
-                    stopAllAudio();
-                    setScreen('setup')
-                  }}
+                  onClick={() => setScreen('setup')}
                   className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-colors shadow-md flex items-center justify-center"
                 >
                   <RotateCcw className="mr-2 w-5 h-5" /> 重新測驗
                 </button>
                 <button
-                  onClick={() => {
-                    stopAllAudio();
-                    setScreen('home')
-                  }}
+                  onClick={() => setScreen('home')}
                   className="py-4 px-6 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-colors shadow-sm flex items-center justify-center"
                   title="回首頁"
                 >
