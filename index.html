@@ -128,6 +128,7 @@
       { id: 'ya', labelH: 'や行 (ya)', labelK: 'ヤ行 (ya)', chars: [{ h: 'や', k: 'ヤ', r: 'ya' }, { h: 'ゆ', k: 'ユ', r: 'yu' }, { h: 'よ', k: 'ヨ', r: 'yo' }] },
       { id: 'ra', labelH: 'ら行 (ra)', labelK: 'ラ行 (ra)', chars: [{ h: 'ら', k: 'ラ', r: 'ra' }, { h: 'り', k: 'リ', r: 'ri' }, { h: 'る', k: 'ル', r: 'ru' }, { h: 'れ', k: 'レ', r: 're' }, { h: 'ろ', k: 'ロ', r: 'ro' }] },
       { id: 'wa', labelH: 'わ行 (wa)', labelK: 'ワ行 (wa)', chars: [{ h: 'わ', k: 'ワ', r: 'wa' }, { h: 'を', k: 'ヲ', r: 'wo' }, { h: 'ん', k: 'ン', r: 'n' }] },
+      // 濁音與半濁音
       { id: 'ga', labelH: 'が行 (ga) [濁音]', labelK: 'ガ行 (ga) [濁音]', chars: [{ h: 'が', k: 'ガ', r: 'ga' }, { h: 'ぎ', k: 'ギ', r: 'gi' }, { h: 'ぐ', k: 'グ', r: 'gu' }, { h: 'げ', k: 'ゲ', r: 'ge' }, { h: 'ご', k: 'ゴ', r: 'go' }] },
       { id: 'za', labelH: 'ざ行 (za) [濁音]', labelK: 'ザ行 (za) [濁音]', chars: [{ h: 'ざ', k: 'ザ', r: 'za' }, { h: 'じ', k: 'ジ', r: 'ji' }, { h: 'ず', k: 'ズ', r: 'zu' }, { h: 'ぜ', k: 'ゼ', r: 'ze' }, { h: 'ぞ', k: 'ゾ', r: 'zo' }] },
       { id: 'da', labelH: 'だ行 (da) [濁音]', labelK: 'ダ行 (da) [濁音]', chars: [{ h: 'だ', k: 'ダ', r: 'da' }, { h: 'ぢ', k: 'ヂ', r: 'ji' }, { h: 'づ', k: 'ヅ', r: 'zu' }, { h: 'で', k: 'デ', r: 'de' }, { h: 'ど', k: 'ド', r: 'do' }] },
@@ -252,13 +253,20 @@
         if (!text) return;
 
         if (useNetworkTTS) {
-          // 呼叫 Google 翻譯的開放網路語音，確保 100% 正確日文發音
-          const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ja&q=${encodeURIComponent(text)}`;
-          const audio = new Audio(url);
+          // 強制使用穩定的 gtx 端點，並在 DOM 中重複利用 audio 標籤以提升相容性
+          let audioEl = document.getElementById('network-tts-player');
+          if (!audioEl) {
+            audioEl = document.createElement('audio');
+            audioEl.id = 'network-tts-player';
+            audioEl.style.display = 'none';
+            document.body.appendChild(audioEl);
+          }
+          audioEl.src = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=ja&q=${encodeURIComponent(text)}`;
           
-          audio.play().catch(err => {
-            console.warn("網路語音播放失敗，自動退回本地語音", err);
-            playLocalTTS(text); // 網路不通時自動切換回原本的語音引擎
+          // 如果使用者勾選了網路語音，就算報錯也「不會」退回原本的中文手機語音，
+          // 以免發出「頓」等難聽聲音造成困擾。
+          audioEl.play().catch(err => {
+            console.warn("網路語音播放受阻，請點擊螢幕上的喇叭按鈕手動播放", err);
           });
         } else {
           // 強制使用手機內建語音 (離線備用)
@@ -498,7 +506,7 @@
           } else {
             const activeRowId = selectedRows[currentRowIndex];
             const rowData = GOJUON_DATA.find(r => r.id === activeRowId);
-            const rowLabel = kanaType === 'katakana' ? rowData.labelK : rowData.labelH;
+            const rowLabel = rowData ? (kanaType === 'katakana' ? rowData.labelK : rowData.labelH) : '';
             
             const newResult = {
               label: rowLabel,
@@ -609,7 +617,7 @@
               </div>
 
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                <h2 className="text-lg font-bold mb-4">2. 選擇語音引擎 <span className="text-sm font-normal text-slate-400 ml-2">(聽聽看哪個順耳)</span></h2>
+                <h2 className="text-lg font-bold mb-4">2. 選擇語音引擎 <span className="text-sm font-normal text-slate-400 ml-2">(點擊按鈕試聽發音)</span></h2>
                 <div className="flex flex-col space-y-3">
                   <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-colors ${useNetworkTTS ? 'bg-indigo-50/50 border-indigo-300' : 'border-slate-200 hover:bg-slate-50'}`}>
                     <div className="mt-1">
@@ -626,7 +634,7 @@
                     </div>
                     <div className="flex flex-col w-full">
                       <span className="font-bold text-slate-700">手機內建語音 (離線備用)</span>
-                      <span className="text-sm text-slate-500 mt-1">無需網路，但部分安卓手機會將單一假名念成「頓」或奇怪口音。</span>
+                      <span className="text-sm text-slate-500 mt-1">無需網路，但若手機未安裝日文語音包，容易發出中文怪音。</span>
                     </div>
                   </label>
                   
@@ -634,7 +642,7 @@
                     onClick={() => playAudio('え')} 
                     className="mt-3 w-max flex items-center bg-slate-100 hover:bg-indigo-100 text-indigo-700 font-bold py-2 px-5 rounded-lg transition-colors border border-slate-200"
                   >
-                    <Volume2 className="w-5 h-5 mr-2" /> 點擊測試發音 (測試「え」的聲音)
+                    <Volume2 className="w-5 h-5 mr-2" /> 試聽目前選擇的語音 (測試「え」)
                   </button>
                 </div>
               </div>
@@ -736,7 +744,7 @@
         
         const activeRowId = selectedRows[currentRowIndex];
         const rowData = GOJUON_DATA.find(r => r.id === activeRowId);
-        const rowLabelText = isVocab ? '相關單字' : (kanaType === 'katakana' ? rowData.labelK : rowData.labelH);
+        const rowLabelText = isVocab ? '相關單字' : (rowData ? (kanaType === 'katakana' ? rowData.labelK : rowData.labelH) : '');
 
         const handleNextLearn = () => {
           if (learnIndex < learnItems.length - 1) {
@@ -889,7 +897,7 @@
         
         const currentRowId = selectedRows[currentRowIndex];
         const rowData = GOJUON_DATA.find(r => r.id === currentRowId);
-        const rowLabelText = kanaType === 'katakana' ? rowData.labelK : rowData.labelH;
+        const rowLabelText = rowData ? (kanaType === 'katakana' ? rowData.labelK : rowData.labelH) : '';
 
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -986,14 +994,17 @@
       }
 
       if (screen === 'transition') {
-        const lastResult = rowResults[rowResults.length - 1];
+        const lastResult = rowResults.length > 0 ? rowResults[rowResults.length - 1] : null;
         const nextIndex = currentRowIndex + 1;
         const hasNext = nextIndex < selectedRows.length;
         const nextRowId = hasNext ? selectedRows[nextIndex] : null;
         const nextRowData = hasNext ? GOJUON_DATA.find(r => r.id === nextRowId) : null;
         const nextRowLabel = nextRowData ? (kanaType === 'katakana' ? nextRowData.labelK : nextRowData.labelH) : '';
 
-        const scorePercentage = lastResult && lastResult.total > 0 ? (lastResult.score / lastResult.total) : 0;
+        const lastScore = lastResult ? lastResult.score : 0;
+        const lastTotal = lastResult ? lastResult.total : 0;
+        const scorePercentage = lastTotal > 0 ? (lastScore / lastTotal) : 0;
+        
         let evaluation = "加油！多複習幾次就會更熟練囉！🌟";
         if (scorePercentage === 1) evaluation = "太厲害了！完美全對！💯";
         else if (scorePercentage >= 0.8) evaluation = "表現優異！手感火熱喔！🔥";
@@ -1006,14 +1017,14 @@
                 關卡挑戰完成
               </span>
               <h2 className="text-3xl font-extrabold text-slate-900 mt-4 mb-2">
-                {lastResult?.label} 通關！
+                {lastResult ? lastResult.label : ''} 通關！
               </h2>
               <p className="text-slate-500 font-medium mb-6">{evaluation}</p>
 
               <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-8">
                 <span className="text-sm font-bold text-slate-400 block mb-1">本行測驗得分</span>
                 <span className="text-4xl font-black text-slate-800">
-                  {lastResult?.score} <span className="text-2xl text-slate-400">/ {lastResult?.total}</span>
+                  {lastScore} <span className="text-2xl text-slate-400">/ {lastTotal}</span>
                 </span>
               </div>
 
