@@ -19,7 +19,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useCallback, useMemo, useEffect } = React;
+    const { useState, useCallback, useMemo, useEffect, useRef } = React;
 
     // --- Inline SVG 元件 ---
     const Volume2 = ({ className }) => (
@@ -170,6 +170,7 @@
       { word: 'でんわ', meaning: '電話', chars: ['で', 'ん', 'わ'] }
     ].map(item => ({ ...item, wordH: item.wordH || item.word }));
 
+    // --- 輔助函式 ---
     const shuffle = (array) => {
       const arr = [...array];
       for (let i = arr.length - 1; i > 0; i--) {
@@ -204,6 +205,7 @@
       const [selectedRows, setSelectedRows] = useState(['a', 'ka']);
       const [quizModes, setQuizModes] = useState(['kanaToRomaji']); 
       const [vocabAutoPlay, setVocabAutoPlay] = useState(true);
+      const [useNetworkVoice, setUseNetworkVoice] = useState(true); // 新增：是否使用網路語音
 
       const [currentRowIndex, setCurrentRowIndex] = useState(0); 
       const [rowResults, setRowResults] = useState([]); 
@@ -217,7 +219,10 @@
       const [isAnswered, setIsAnswered] = useState(false);
       const [selectedOption, setSelectedOption] = useState(null);
 
-      // 預先載入語音包，確保 Android / Chrome 能抓到語音清單
+      // 用於網路發音的 Audio 實體參考
+      const audioRef = useRef(null);
+
+      // 預先載入系統語音包 (保留給離線模式使用)
       useEffect(() => {
         const initVoices = () => {
           if ('speechSynthesis' in window) {
@@ -230,17 +235,51 @@
         }
       }, []);
 
-      // 播放語音機制：強制綁定日文，解決「頓」與中文怪音問題
-      const playAudio = useCallback((text) => {
-        if (!text) return;
+      // 統一停止所有聲音
+      const stopAllAudio = useCallback(() => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
         if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel();
-          
+        }
+      }, []);
+
+      // 播放語音機制：依據設定選擇網路語音(高音質/防雷) 或 離線語音
+      const playAudio = useCallback((text) => {
+        if (!text) return;
+        
+        // 移除可能干擾朗讀的標點符號
+        const cleanText = text.replace(/[、。！？]/g, '');
+
+        // 1. 如果啟用網路發音 (透過 Google Translate TTS API)
+        if (useNetworkVoice) {
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+          // 透過設定 tl=ja 明確指定使用日文引擎，徹底解決 Android 手機發音怪異問題
+          audioRef.current = new Audio(`https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=ja&q=${encodeURIComponent(cleanText)}`);
+          audioRef.current.playbackRate = 0.9;
+          audioRef.current.play().catch(e => {
+            console.log("網路語音播放失敗，自動切換至本地發音", e);
+            playLocalTTS(cleanText);
+          });
+          return;
+        }
+
+        // 2. 如果未啟用網路，則使用本地發音
+        playLocalTTS(cleanText);
+      }, [useNetworkVoice]);
+
+      const playLocalTTS = (text) => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
           const utterance = new SpeechSynthesisUtterance(text);
           utterance.lang = 'ja-JP'; 
-          utterance.rate = 0.85; // 放慢發音速度讓初學者聽得更清楚
+          utterance.rate = 0.85; 
           
-          // 強制搜尋並套用系統內的日文語音引擎
           const voices = window.speechSynthesis.getVoices();
           const jaVoices = voices.filter(voice => 
             voice.lang === 'ja-JP' || 
@@ -250,14 +289,13 @@
           );
           
           if (jaVoices.length > 0) {
-            // 優先找尋 Google 的日文語音包，發音最標準，否則使用找到的第一個日文語音
             const googleVoice = jaVoices.find(v => v.name.includes('Google'));
             utterance.voice = googleVoice || jaVoices[0];
           }
 
           window.speechSynthesis.speak(utterance);
         }
-      }, []);
+      };
 
       const availableVocab = useMemo(() => {
         if (selectedRows.length === 0) return [];
@@ -320,7 +358,7 @@
         return false;
       }, [selectedRows, quizModes]);
 
-      // 建立假名選項 (防雷、取代 flatMap)
+      // 建立假名選項 
       const createKanaQuestion = (target, fullPool, mode) => {
         let sameRowChars = fullPool.filter(c => c.rowId === target.rowId && c.r !== target.r);
         let otherRowsChars = fullPool.filter(c => c.rowId !== target.rowId);
@@ -331,7 +369,6 @@
           distractors.push(...shuffle(otherRowsChars).slice(0, 3 - distractors.length));
         }
         if (distractors.length < 3) {
-           // 使用 reduce 取代 flatMap 確保手機與舊瀏覽器相容
            const allChars = GOJUON_DATA.reduce((acc, r) => acc.concat(r.chars), []).filter(c => c.r !== target.r && !distractors.find(d => d.r === c.r));
            distractors.push(...shuffle(allChars).slice(0, 3 - distractors.length));
         }
@@ -424,7 +461,6 @@
         setRowScore(0);
         setScreen('learn');
 
-        // 播放學習畫面第一張卡片的發音
         const firstItem = itemsToLearn[0];
         if (firstItem) {
           const pron = firstItem.type === 'vocab' 
@@ -432,7 +468,7 @@
               : (kanaType === 'katakana' ? firstItem.data.k : firstItem.data.h);
           playAudio(pron);
         }
-      }; // 這裡補上了遺失的大括號！
+      };
 
       const startQuiz = () => {
         if (isStartDisabled) return;
@@ -449,7 +485,7 @@
           const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(firstQ.target.wordH) : firstQ.target.wordH;
           playAudio(pronunciation);
         } else {
-          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+          stopAllAudio();
         }
       };
 
@@ -558,8 +594,8 @@
                   <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
                     <Headphones className="w-6 h-6" />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">真人發音與防雷</h3>
-                  <p className="text-slate-500">搭載標準日語語音引擎，具備防作弊機制，答題完後才可聽音，落實自我檢測。</p>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">網路高音質發音</h3>
+                  <p className="text-slate-500">搭載高音質網路語音引擎，徹底解決手機瀏覽器發音怪異或無聲的問題，聆聽最標準口音。</p>
                 </div>
               </div>
 
@@ -669,13 +705,28 @@
                               checked={vocabAutoPlay} 
                               onChange={(e) => setVocabAutoPlay(e.target.checked)} 
                             />
-                            <span className="text-sm font-bold text-indigo-800">測驗時自動朗讀題目 (聽力複習)</span>
+                            <span className="text-sm font-bold text-indigo-800">測驗時自動朗讀單字 (聽力複習)</span>
                           </label>
                         </div>
                       )}
                     </div>
                   </label>
                 </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                <h2 className="text-lg font-bold mb-4">4. 語音引擎設定</h2>
+                <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-colors ${useNetworkVoice ? 'bg-indigo-50/50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'}`}>
+                  <div className="mt-1">
+                    <input type="checkbox" className="w-5 h-5 text-indigo-600 rounded border-slate-300 mr-4" checked={useNetworkVoice} onChange={() => setUseNetworkVoice(!useNetworkVoice)} />
+                  </div>
+                  <div className="flex flex-col w-full">
+                    <span className="font-bold text-slate-700">啟用高音質網路發音 (強烈推薦)</span>
+                    <span className="text-sm text-slate-500 mt-1 leading-relaxed">
+                      若您的手機會發出奇怪的怪聲、讀成中文或完全沒有聲音，請保持此選項開啟以使用標準日文發音。（需連線網路）
+                    </span>
+                  </div>
+                </label>
               </div>
 
               <button
@@ -746,7 +797,7 @@
               <div className="flex justify-between items-center mb-6 px-2">
                 <button 
                   onClick={() => {
-                    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                    stopAllAudio();
                     setScreen('setup');
                   }}
                   className="flex items-center justify-center p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
@@ -765,7 +816,7 @@
                 </button>
               </div>
 
-              <div className="bg-white rounded-[2rem] shadow-xl p-10 md:p-14 mb-8 border border-slate-100 flex flex-col items-center relative text-center">
+              <div className="bg-white rounded-[2rem] shadow-xl p-10 md:p-14 mb-8 border border-slate-100 flex flex-col items-center relative text-center transition-all">
                  <p className="text-sm text-indigo-600 mb-4 font-bold tracking-widest bg-indigo-50 px-4 py-1 rounded-full">
                    — {rowLabelText} 學習 —
                  </p>
@@ -867,7 +918,7 @@
               <div className="flex justify-between items-center mb-6 px-2">
                 <button 
                   onClick={() => {
-                    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                    stopAllAudio();
                     setScreen('setup'); 
                   }}
                   className="flex items-center justify-center p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
@@ -1041,13 +1092,19 @@
 
               <div className="flex gap-4">
                 <button
-                  onClick={() => setScreen('setup')}
+                  onClick={() => {
+                    stopAllAudio();
+                    setScreen('setup')
+                  }}
                   className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-colors shadow-md flex items-center justify-center"
                 >
                   <RotateCcw className="mr-2 w-5 h-5" /> 重新測驗
                 </button>
                 <button
-                  onClick={() => setScreen('home')}
+                  onClick={() => {
+                    stopAllAudio();
+                    setScreen('home')
+                  }}
                   className="py-4 px-6 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-colors shadow-sm flex items-center justify-center"
                   title="回首頁"
                 >
