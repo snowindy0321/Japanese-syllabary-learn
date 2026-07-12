@@ -29,7 +29,7 @@
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
       </svg>
     );
-    const SettingsIcon = ({ className }) => (
+    const Settings = ({ className }) => (
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <circle cx="12" cy="12" r="3"></circle>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -109,12 +109,6 @@
         <rect x="2" y="6" width="20" height="12" rx="2"></rect>
       </svg>
     );
-    const CheckSquare = ({ className, checked }) => (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={checked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-        {checked && <polyline points="9 12 12 15 16 9" stroke={checked ? "white" : "currentColor"}></polyline>}
-      </svg>
-    );
 
     // --- 資料庫定義 ---
     const GOJUON_DATA = [
@@ -168,9 +162,8 @@
       { word: 'かぜ', meaning: '風', chars: ['か', 'ぜ'] },
       { word: 'みず', meaning: '水', chars: ['み', 'ず'] },
       { word: 'でんわ', meaning: '電話', chars: ['で', 'ん', 'わ'] }
-    ];
+    ].map(item => ({ ...item, wordH: item.wordH || item.word }));
 
-    // --- 輔助函式 ---
     const shuffle = (array) => {
       const arr = [...array];
       for (let i = arr.length - 1; i > 0; i--) {
@@ -178,6 +171,17 @@
         [arr[i], arr[j]] = [arr[j], arr[i]];
       }
       return arr;
+    };
+
+    const convertToKatakanaVocab = (hiraganaStr) => {
+      if (!hiraganaStr) return '';
+      const hToKMap = {};
+      GOJUON_DATA.forEach(row => {
+        row.chars.forEach(c => {
+          hToKMap[c.h] = c.k;
+        });
+      });
+      return hiraganaStr.split('').map(char => hToKMap[char] || char).join('');
     };
 
     const kanaToRowMap = {};
@@ -190,114 +194,80 @@
 
     function App() {
       const [screen, setScreen] = useState('home'); 
-      const [kanaType, setKanaType] = useState('hiragana');
+      const [kanaType, setKanaType] = useState('hiragana'); 
       const [selectedRows, setSelectedRows] = useState(['a', 'ka']);
-      
-      // 測驗模式改為複選
-      const [selectedModes, setSelectedModes] = useState({
-        kanaToRomaji: true,
-        romajiToKana: false,
-        vocab: false
-      });
+      const [quizModes, setQuizModes] = useState(['kanaToRomaji']); 
       const [vocabAutoPlay, setVocabAutoPlay] = useState(true);
 
-      // 行別專注學習的狀態
-      const [activeRowIndex, setActiveRowIndex] = useState(0); 
-      const [rowResults, setRowResults] = useState([]); // 記錄每一行的成績
-
-      // 目前這一行的狀態
-      const [currentQuestions, setCurrentQuestions] = useState([]);      
-      const [currentLearnItems, setCurrentLearnItems] = useState([]);    
+      const [currentRowIndex, setCurrentRowIndex] = useState(0); 
+      const [rowResults, setRowResults] = useState([]); 
+      
+      const [questions, setQuestions] = useState([]);      
+      const [learnItems, setLearnItems] = useState([]);    
       const [learnIndex, setLearnIndex] = useState(0);     
-      const [quizIndex, setQuizIndex] = useState(0); 
-      const [score, setScore] = useState(0);
+      const [currentIndex, setCurrentIndex] = useState(0); 
+      const [score, setScore] = useState(0); 
+      const [rowScore, setRowScore] = useState(0); 
       const [isAnswered, setIsAnswered] = useState(false);
       const [selectedOption, setSelectedOption] = useState(null);
 
-      // --- 修復語音問題 ---
-      // 1. 初始化語音引擎 (非同步獲取)
+      // 預先載入語音包，確保 Android / Chrome 能抓到語音清單
       useEffect(() => {
-        const initVoices = () => {
-          if ('speechSynthesis' in window) {
-            window.speechSynthesis.getVoices();
-          }
-        };
-        initVoices();
         if ('speechSynthesis' in window) {
-          window.speechSynthesis.onvoiceschanged = initVoices;
+          window.speechSynthesis.onvoiceschanged = () => {
+            window.speechSynthesis.getVoices();
+          };
+          window.speechSynthesis.getVoices();
         }
       }, []);
 
-      // 2. 播放語音函式 (強迫綁定日文)
+      // 播放語音機制
       const playAudio = useCallback((text) => {
+        if (!text) return;
         if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel();
           
-          // 移除所有可能導致中文語音引擎誤判的符號
-          const cleanText = text; 
+          // 【核心修復】在 Android 上，Google TTS 如果只遇到一個假名（例如「え」），
+          // 很容易誤判為中文或其他符號發出怪聲。加上日文句號「。」能強制它視為日文句子。
+          const speakText = text.includes('。') ? text : text + '。';
           
-          const utterance = new SpeechSynthesisUtterance(cleanText);
-          utterance.lang = 'ja-JP'; // 標記為日文
-          utterance.rate = 0.9; 
-
-          // 強制搜尋日文語音包
+          const utterance = new SpeechSynthesisUtterance(speakText);
+          utterance.lang = 'ja-JP'; 
+          utterance.rate = 0.85; // 放慢發音速度讓初學者聽得更清楚
+          
+          // 強制搜尋並套用系統內的日文語音引擎
           const voices = window.speechSynthesis.getVoices();
-          const jaVoice = voices.find(v => 
-            v.lang === 'ja-JP' || 
-            v.lang === 'ja_JP' || 
-            v.lang.includes('ja') || 
-            v.name.includes('Japanese') ||
-            v.name.includes('日本')
+          const jaVoices = voices.filter(voice => 
+            voice.lang === 'ja-JP' || 
+            voice.lang === 'ja_JP' || 
+            voice.lang.includes('ja-') ||
+            voice.name.toLowerCase().includes('japan')
           );
-
-          // 如果有找到真正的日文語音包，就強制指定給它
-          if (jaVoice) {
-            utterance.voice = jaVoice;
+          
+          if (jaVoices.length > 0) {
+            // 優先找尋 Google 的日文語音包，發音最標準，否則使用找到的第一個日文語音
+            const googleVoice = jaVoices.find(v => v.name.includes('Google'));
+            utterance.voice = googleVoice || jaVoices[0];
           }
 
           window.speechSynthesis.speak(utterance);
         }
       }, []);
-      // --------------------
 
-      // 判斷按鈕是否可以點擊 (防呆)
-      const isStartDisabled = useMemo(() => {
-        if (selectedRows.length === 0) return true;
-        
-        const hasKanaMode = selectedModes.kanaToRomaji || selectedModes.romajiToKana;
-        const hasVocabMode = selectedModes.vocab;
-        
-        if (!hasKanaMode && !hasVocabMode) return true;
-
-        if (!hasKanaMode && hasVocabMode) {
-           let validVocabCount = 0;
-           selectedRows.forEach(rowId => {
-             const vocabForThisRow = VOCAB_LIST.filter(vocab => {
-                const isFromThisRow = vocab.chars.every(char => kanaToRowMap[char] === rowId);
-                const isFromPreviousRows = vocab.chars.every(char => {
-                   const charRowId = kanaToRowMap[char];
-                   return selectedRows.indexOf(charRowId) <= selectedRows.indexOf(rowId);
-                });
-                return isFromThisRow || isFromPreviousRows;
-             });
-             validVocabCount += vocabForThisRow.length;
-           });
-           if (validVocabCount === 0) return true;
-        }
-        return false;
-      }, [selectedRows, selectedModes]);
+      const availableVocab = useMemo(() => {
+        if (selectedRows.length === 0) return [];
+        return VOCAB_LIST.filter(vocab => {
+          return vocab.chars.every(char => {
+            const rowId = kanaToRowMap[char];
+            return selectedRows.includes(rowId);
+          });
+        });
+      }, [selectedRows]);
 
       const handleToggleRow = (rowId) => {
         setSelectedRows(prev => 
           prev.includes(rowId) ? prev.filter(id => id !== rowId) : [...prev, rowId]
         );
-      };
-
-      const handleToggleMode = (mode) => {
-        setSelectedModes(prev => ({
-          ...prev,
-          [mode]: !prev[mode]
-        }));
       };
 
       const handleSelectAll = (isSeion) => {
@@ -314,104 +284,93 @@
         }
       };
 
-      // 載入「特定一行」的資料
-      const loadRowData = (rowIndex) => {
-        if (rowIndex >= selectedRows.length) {
-          setScreen('result');
-          return;
-        }
+      const handleToggleQuizMode = (mode) => {
+        setQuizModes(prev => 
+          prev.includes(mode) ? prev.filter(m => m !== mode) : [...prev, mode]
+        );
+      };
 
-        const currentRowId = selectedRows[rowIndex];
-        const rowData = GOJUON_DATA.find(r => r.id === currentRowId);
-        
+      const startQuizForCurrentRow = (rowIndex) => {
+        const activeRowId = selectedRows[rowIndex];
+        const rowData = GOJUON_DATA.find(r => r.id === activeRowId);
+        if (!rowData) return;
+
+        let charPool = [];
+        rowData.chars.forEach((charObj, cIdx) => {
+          charPool.push({ 
+            ...charObj, 
+            rowId: rowData.id, 
+            rowLabelH: rowData.labelH,
+            rowLabelK: rowData.labelK,
+            sortOrder: cIdx 
+          });
+        });
+
         let newQuestions = [];
         let itemsToLearn = [];
 
-        // 1. 處理假名題型
-        if (selectedModes.kanaToRomaji || selectedModes.romajiToKana) {
-          let pool = [];
-          selectedRows.forEach(id => {
-            const rData = GOJUON_DATA.find(r => r.id === id);
-            if (rData) {
-              rData.chars.forEach(charObj => {
-                pool.push({ 
-                  ...charObj, 
-                  rowId: rData.id, 
-                  rowLabelH: rData.labelH,
-                  rowLabelK: rData.labelK,
-                });
-              });
-            }
-          });
+        const hasCharMode = quizModes.includes('kanaToRomaji') || quizModes.includes('romajiToKana');
 
-          // 取出當前行的假名
-          const currentRowChars = pool.filter(c => c.rowId === currentRowId);
+        if (hasCharMode) {
+          itemsToLearn.push(...charPool);
           
-          currentRowChars.forEach(target => {
-            itemsToLearn.push({ type: 'char', data: target });
+          const getDistractors = (target) => {
+            let sameRowChars = charPool.filter(c => c.r !== target.r);
+            let otherRowsChars = GOJUON_DATA.reduce((acc, r) => acc.concat(r.chars), []).filter(c => c.r !== target.r);
+            let distractors = [];
+            
+            distractors.push(...shuffle(sameRowChars).slice(0, 3));
+            if (distractors.length < 3) {
+              distractors.push(...shuffle(otherRowsChars).slice(0, 3 - distractors.length));
+            }
+            return distractors;
+          };
 
-            if (selectedModes.kanaToRomaji) {
-              newQuestions.push(createKanaQuestion(target, pool, 'kanaToRomaji'));
-            }
-            if (selectedModes.romajiToKana) {
-              newQuestions.push(createKanaQuestion(target, pool, 'romajiToKana'));
-            }
-          });
+          if (quizModes.includes('kanaToRomaji')) {
+            newQuestions.push(...charPool.map(target => {
+              const distractors = getDistractors(target);
+              return { type: 'char', format: 'kanaToRomaji', target, options: shuffle([target, ...distractors]) };
+            }));
+          }
+          
+          if (quizModes.includes('romajiToKana')) {
+            newQuestions.push(...charPool.map(target => {
+              const distractors = getDistractors(target);
+              return { type: 'char', format: 'romajiToKana', target, options: shuffle([target, ...distractors]) };
+            }));
+          }
         }
 
-        // 2. 處理字彙題型 (只取「可以由目前學習過的行」組合出來的單字)
-        if (selectedModes.vocab) {
-          const allowedRowIds = selectedRows.slice(0, rowIndex + 1);
-          
-          const validVocabs = VOCAB_LIST.filter(vocab => {
-            const usesCurrentRow = vocab.chars.some(char => kanaToRowMap[char] === currentRowId);
-            const allCharsValid = vocab.chars.every(char => allowedRowIds.includes(kanaToRowMap[char]));
-            return usesCurrentRow && allCharsValid;
+        if (quizModes.includes('vocab')) {
+          const rowRelatedVocab = VOCAB_LIST.filter(vocab => {
+            const hasActiveRowChar = vocab.chars.some(char => kanaToRowMap[char] === activeRowId);
+            const allCharsInSelected = vocab.chars.every(char => selectedRows.includes(kanaToRowMap[char]));
+            return hasActiveRowChar && allCharsInSelected;
           });
 
-          if (validVocabs.length > 0) {
-            const shuffledVocabs = shuffle(validVocabs).slice(0, 5); 
-            shuffledVocabs.forEach(target => {
-              itemsToLearn.push({ type: 'vocab', data: target });
-              
+          const shuffledVocab = shuffle(rowRelatedVocab).slice(0, 5);
+          
+          if (shuffledVocab.length > 0) {
+            itemsToLearn.push(...shuffledVocab);
+            
+            newQuestions.push(...shuffledVocab.map(target => {
               let distractors = VOCAB_LIST.filter(v => v.word !== target.word);
               distractors = shuffle(distractors).slice(0, 3);
-              const options = shuffle([target, ...distractors]);
-              
-              newQuestions.push({
-                type: 'vocab',
-                target: target,
-                options: options
-              });
-            });
+              return { type: 'vocab', target, options: shuffle([target, ...distractors]) };
+            }));
           }
         }
 
-        if (newQuestions.length > 0) {
-          setQuestions(shuffle(newQuestions));
-          setLearnItems(itemsToLearn);
-          
-          setCurrentIndex(0);
-          setLearnIndex(0);
-          setScore(0);
-          setIsAnswered(false);
-          setSelectedOption(null);
-          
-          setScreen('learn');
-          
-          // 播放第一張卡
-          const firstTarget = itemsToLearn[0];
-          if (firstTarget.type === 'vocab') {
-            playAudio(firstTarget.data.word);
+        if (newQuestions.length === 0) {
+          const nextIndex = rowIndex + 1;
+          if (nextIndex < selectedRows.length) {
+            setCurrentRowIndex(nextIndex);
+            startQuizForCurrentRow(nextIndex);
           } else {
-            playAudio(kanaType === 'katakana' ? firstTarget.data.k : firstTarget.data.h);
+            setScreen('result');
           }
-        } else {
-           // 如果這一行剛好沒有任何題目 (例如只選了單字模式，但這行組不出單字)
-           // 直接進入下一行
-           loadRowData(rowIndex + 1);
+          return;
         }
-      };
 
       const createKanaQuestion = (target, fullPool, mode) => {
         let sameRowChars = fullPool.filter(c => c.rowId === target.rowId && c.r !== target.r);
@@ -423,7 +382,8 @@
           distractors.push(...shuffle(otherRowsChars).slice(0, 3 - distractors.length));
         }
         if (distractors.length < 3) {
-           const allChars = GOJUON_DATA.flatMap(r => r.chars).filter(c => c.r !== target.r && !distractors.find(d => d.r === c.r));
+           // 已將容易導致手機瀏覽器當機的 flatMap 替換為相容性 100% 的 reduce 寫法
+           const allChars = GOJUON_DATA.reduce((acc, r) => acc.concat(r.chars), []).filter(c => c.r !== target.r && !distractors.find(d => d.r === c.r));
            distractors.push(...shuffle(allChars).slice(0, 3 - distractors.length));
         }
 
@@ -435,18 +395,19 @@
       };
 
       const startQuiz = () => {
-        if (isStartDisabled) return;
+        if (selectedRows.length === 0 || quizModes.length === 0) return;
         setRowResults([]);
-        setActiveRowIndex(0);
-        loadRowData(0);
+        setScore(0);
+        setCurrentRowIndex(0);
+        startQuizForCurrentRow(0);
       };
 
       const proceedToQuiz = () => {
         setScreen('quiz');
-        
-        const firstQ = currentQuestions[0];
-        if (firstQ.type === 'vocab' && vocabAutoPlay) {
-          playAudio(firstQ.target.word);
+        const firstQ = questions[0];
+        if (firstQ && firstQ.type === 'vocab' && vocabAutoPlay) {
+          const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(firstQ.target.wordH) : firstQ.target.wordH;
+          playAudio(pronunciation);
         } else {
           if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         }
@@ -458,7 +419,9 @@
         setIsAnswered(true);
         setSelectedOption(option);
         
-        const currentQ = currentQuestions[quizIndex];
+        const currentQ = questions[currentIndex];
+        if (!currentQ) return;
+
         let isCorrect = false;
 
         if (currentQ.type === 'vocab') {
@@ -467,62 +430,62 @@
           isCorrect = option.r === currentQ.target.r;
         }
 
-        let newScore = score;
         if (isCorrect) {
-          newScore += 1;
-          setScore(newScore);
+          setScore(prev => prev + 1);
+          setRowScore(prev => prev + 1);
         }
         
         if (currentQ.type === 'vocab') {
-          playAudio(currentQ.target.word);
+          const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(currentQ.target.wordH) : currentQ.target.wordH;
+          playAudio(pronunciation);
         } else {
           playAudio(kanaType === 'katakana' ? currentQ.target.k : currentQ.target.h);
         }
 
         setTimeout(() => {
-          if (quizIndex + 1 < currentQuestions.length) {
-            setQuizIndex(prev => prev + 1);
+          if (currentIndex + 1 < questions.length) {
+            setCurrentIndex(prev => prev + 1);
             setIsAnswered(false);
             setSelectedOption(null);
             
-            const nextQ = currentQuestions[quizIndex + 1];
-            if (nextQ.type === 'vocab' && vocabAutoPlay) {
-              playAudio(nextQ.target.word);
+            const nextQ = questions[currentIndex + 1];
+            if (nextQ && nextQ.type === 'vocab' && vocabAutoPlay) {
+              const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(nextQ.target.wordH) : nextQ.target.wordH;
+              playAudio(pronunciation);
             }
           } else {
-            // 這一行測驗結束，記錄成績並準備下一行
-            const currentRowId = selectedRows[activeRowIndex];
-            const rowData = GOJUON_DATA.find(r => r.id === currentRowId);
-            const rowName = kanaType === 'katakana' ? rowData.labelK : rowData.labelH;
+            const activeRowId = selectedRows[currentRowIndex];
+            const rowData = GOJUON_DATA.find(r => r.id === activeRowId);
+            const rowLabel = kanaType === 'katakana' ? rowData.labelK : rowData.labelH;
             
-            setRowResults(prev => [...prev, {
-              rowName: rowName,
-              score: newScore,
-              total: currentQuestions.length
-            }]);
-
-            const nextRowIndex = activeRowIndex + 1;
-            setActiveRowIndex(nextRowIndex);
+            const newResult = {
+              label: rowLabel,
+              score: rowScore + (isCorrect ? 1 : 0),
+              total: questions.length
+            };
             
-            if (nextRowIndex < selectedRows.length) {
-               // 繼續下一行 (回到學習)
-               loadRowData(nextRowIndex);
-            } else {
-               // 全部的行都測驗完畢
-               setScreen('result');
-            }
+            setRowResults(prev => [...prev, newResult]);
+            setScreen('transition');
           }
         }, 1500);
       };
 
-      // --- 以下為 UI 渲染 (已簡化狀態存取) ---
+      const handleNextRow = () => {
+        const nextIndex = currentRowIndex + 1;
+        if (nextIndex < selectedRows.length) {
+          setCurrentRowIndex(nextIndex);
+          startQuizForCurrentRow(nextIndex);
+        } else {
+          setScreen('result');
+        }
+      };
 
       if (screen === 'home') {
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 md:p-8">
             <div className="max-w-4xl w-full text-center space-y-8">
               <div className="flex justify-center mb-6">
-                <div className="w-28 h-28 bg-indigo-100 text-indigo-600 rounded-[2rem] flex items-center justify-center text-6xl font-black shadow-inner">
+                <div className="w-28 h-28 bg-indigo-100 text-indigo-600 rounded-[2rem] flex items-center justify-center text-6xl font-black shadow-inner animate-pulse">
                   あ
                 </div>
               </div>
@@ -532,7 +495,7 @@
                   五十音學習與複習系統
                 </h1>
                 <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto">
-                  專為日語初學者打造，透過彈性的範圍選擇、測驗前學習與真人語音朗讀，幫助您輕鬆打好日文基礎。
+                  專為日語學習者設計，採用「單行式循環學習法」，一次學完一行立刻測驗，循序漸進攻克所有五十音。
                 </p>
               </div>
 
@@ -541,22 +504,22 @@
                   <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4">
                     <BookOpen className="w-6 h-6" />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">逐行專注學習</h3>
-                  <p className="text-slate-500">不會一次把所有字丟給您！系統會「一次一行」帶您反覆學習並測驗，穩紮穩打。</p>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">單行專注學習</h3>
+                  <p className="text-slate-500">自由勾選複習範圍，系統會自動切分為「一行一行」的學習字卡，讓吸收更有效率。</p>
                 </div>
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                   <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-4">
                     <Gamepad2 className="w-6 h-6" />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">混合題型測驗</h3>
-                  <p className="text-slate-500">在進入測驗前，系統會先提供該範圍的字卡，測驗時則可混合多種題型完全打亂測試真功夫。</p>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">精準單行測驗</h3>
+                  <p className="text-slate-500">學完該行假名立刻進入打亂測驗，混合發音及字彙練習，加深短期記憶。</p>
                 </div>
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
                   <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
                     <Headphones className="w-6 h-6" />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">標準日文語音</h3>
-                  <p className="text-slate-500">強制綁定系統內建日文語音引擎，學習與答題後即時聆聽正確發音，告別奇怪口音。</p>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">真人發音與防雷</h3>
+                  <p className="text-slate-500">搭載標準日語語音引擎，具備防作弊機制，答題完後才可聽音，落實自我檢測。</p>
                 </div>
               </div>
 
@@ -572,6 +535,9 @@
       }
 
       if (screen === 'setup') {
+        const hasCharMode = quizModes.includes('kanaToRomaji') || quizModes.includes('romajiToKana');
+        const isStartDisabled = selectedRows.length === 0 || quizModes.length === 0 || (!hasCharMode && availableVocab.length === 0);
+        
         return (
           <div className="min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8">
             <div className="max-w-3xl mx-auto space-y-6">
@@ -583,18 +549,18 @@
                 >
                   <ArrowLeft className="w-6 h-6" />
                 </button>
-                <SettingsIcon className="w-8 h-8 text-indigo-600" />
+                <Settings className="w-8 h-8 text-indigo-600" />
                 <h1 className="text-2xl font-bold text-slate-900">測驗設定</h1>
               </header>
 
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
                 <h2 className="text-lg font-bold mb-4">1. 選擇假名字體</h2>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <label className={`flex-1 flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all ${kanaType === 'hiragana' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 hover:border-indigo-200 text-slate-600'}`}>
+                  <label className={`flex-1 flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all ${kanaType === 'hiragana' ? 'bg-indigo-50 border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-200'}`}>
                     <input type="radio" name="kanaType" className="sr-only" checked={kanaType === 'hiragana'} onChange={() => setKanaType('hiragana')} />
                     <span className="font-bold text-lg">平假名 (Hiragana)</span>
                   </label>
-                  <label className={`flex-1 flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all ${kanaType === 'katakana' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 hover:border-indigo-200 text-slate-600'}`}>
+                  <label className={`flex-1 flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all ${kanaType === 'katakana' ? 'bg-indigo-50 border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-200'}`}>
                     <input type="radio" name="kanaType" className="sr-only" checked={kanaType === 'katakana'} onChange={() => setKanaType('katakana')} />
                     <span className="font-bold text-lg">片假名 (Katakana)</span>
                   </label>
@@ -602,13 +568,19 @@
               </div>
 
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                <h2 className="text-lg font-bold mb-4">2. 選擇學習與測驗範圍 <span className="text-sm font-normal text-slate-400 ml-2">(系統將逐行帶您練習)</span></h2>
+                <h2 className="text-lg font-bold mb-4">2. 選擇學習與測驗範圍（將依序逐行練習）</h2>
                 
                 <div className="mb-4 flex gap-4">
-                  <button onClick={() => handleSelectAll(true)} className="text-sm px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors">
+                  <button 
+                    onClick={() => handleSelectAll(true)}
+                    className="text-sm px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors"
+                  >
                     全選 / 取消 清音
                   </button>
-                  <button onClick={() => handleSelectAll(false)} className="text-sm px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors">
+                  <button 
+                    onClick={() => handleSelectAll(false)}
+                    className="text-sm px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors"
+                  >
                     全選 / 取消 濁音
                   </button>
                 </div>
@@ -622,7 +594,7 @@
                         checked={selectedRows.includes(row.id)}
                         onChange={() => handleToggleRow(row.id)}
                       />
-                      <span className="text-sm font-medium text-slate-700">
+                      <span className="text-sm font-medium">
                         {kanaType === 'katakana' ? row.labelK : row.labelH}
                       </span>
                     </label>
@@ -631,32 +603,27 @@
               </div>
 
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                <h2 className="text-lg font-bold mb-4">3. 選擇測驗題型 <span className="text-sm font-normal text-slate-400 ml-2">(可複選，測驗時將混合出現)</span></h2>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <label className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-colors ${selectedModes.kanaToRomaji ? 'bg-indigo-50/50 border-indigo-300' : 'border-slate-200 hover:bg-slate-50'}`}>
-                    <CheckSquare checked={selectedModes.kanaToRomaji} className="w-6 h-6 mr-3 text-indigo-600 flex-shrink-0" />
-                    <input type="checkbox" className="sr-only" checked={selectedModes.kanaToRomaji} onChange={() => handleToggleMode('kanaToRomaji')} />
-                    <span className="font-bold text-slate-700">看假名，選羅馬拼音</span>
+                <h2 className="text-lg font-bold mb-4">3. 選擇測驗題型 (可複選，每行獨立考驗)</h2>
+                <div className="flex flex-col space-y-3">
+                  <label className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-colors ${quizModes.includes('kanaToRomaji') ? 'bg-indigo-50/50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'}`}>
+                    <input type="checkbox" className="w-5 h-5 text-indigo-600 rounded border-slate-300 mr-4" checked={quizModes.includes('kanaToRomaji')} onChange={() => handleToggleQuizMode('kanaToRomaji')} />
+                    <span className="font-bold text-slate-700">看假名，選羅馬發音</span>
                   </label>
-                  <label className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-colors ${selectedModes.romajiToKana ? 'bg-indigo-50/50 border-indigo-300' : 'border-slate-200 hover:bg-slate-50'}`}>
-                    <CheckSquare checked={selectedModes.romajiToKana} className="w-6 h-6 mr-3 text-indigo-600 flex-shrink-0" />
-                    <input type="checkbox" className="sr-only" checked={selectedModes.romajiToKana} onChange={() => handleToggleMode('romajiToKana')} />
-                    <span className="font-bold text-slate-700">看拼音，選正確假名</span>
+                  <label className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-colors ${quizModes.includes('romajiToKana') ? 'bg-indigo-50/50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'}`}>
+                    <input type="checkbox" className="w-5 h-5 text-indigo-600 rounded border-slate-300 mr-4" checked={quizModes.includes('romajiToKana')} onChange={() => handleToggleQuizMode('romajiToKana')} />
+                    <span className="font-bold text-slate-700">看發音，選正確假名</span>
                   </label>
-                </div>
-                
-                <div className="mt-4">
-                  <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-colors ${selectedModes.vocab ? 'bg-indigo-50/50 border-indigo-300' : 'border-slate-200 hover:bg-slate-50'}`}>
+                  
+                  <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-colors ${quizModes.includes('vocab') ? 'bg-indigo-50/50 border-indigo-200' : 'border-slate-200 hover:bg-slate-50'}`}>
                     <div className="mt-1">
-                      <CheckSquare checked={selectedModes.vocab} className="w-6 h-6 mr-3 text-indigo-600" />
-                      <input type="checkbox" className="sr-only" checked={selectedModes.vocab} onChange={() => handleToggleMode('vocab')} />
+                      <input type="checkbox" className="w-5 h-5 text-indigo-600 rounded border-slate-300 mr-4" checked={quizModes.includes('vocab')} onChange={() => handleToggleQuizMode('vocab')} />
                     </div>
                     <div className="flex flex-col w-full">
-                      <span className="font-bold text-slate-700">綜合單字測驗</span>
-                      <span className="text-sm text-slate-500 mt-1 leading-relaxed">
-                        系統會自動挑選「完全由您目前學習過的行」所組成的單字來測驗。
+                      <span className="font-bold text-slate-700">字彙測驗 (各行相關單字)</span>
+                      <span className="text-sm text-slate-500 mt-1">
+                        目前所選範圍內可用單字數：{availableVocab.length} 題
                       </span>
-                      {selectedModes.vocab && (
+                      {quizModes.includes('vocab') && (
                         <div className="mt-3 flex items-center" onClick={(e) => e.stopPropagation()}>
                           <label className="flex items-center p-2.5 bg-indigo-100/70 rounded-lg cursor-pointer hover:bg-indigo-200/60 transition-colors">
                             <input 
@@ -665,7 +632,7 @@
                               checked={vocabAutoPlay} 
                               onChange={(e) => setVocabAutoPlay(e.target.checked)} 
                             />
-                            <span className="text-sm font-bold text-indigo-800">測驗時自動朗讀單字 (聽力測驗模式)</span>
+                            <span className="text-sm font-bold text-indigo-800">測驗時自動朗讀題目 (聽力複習)</span>
                           </label>
                         </div>
                       )}
@@ -679,8 +646,7 @@
                 disabled={isStartDisabled}
                 className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-bold text-xl hover:bg-indigo-700 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center shadow-lg"
               >
-                {isStartDisabled ? '請至少選擇一個範圍與題型' : '開始學習與測驗'} 
-                {!isStartDisabled && <ArrowRight className="ml-2 w-6 h-6" />}
+                開始循序複習 <ArrowRight className="ml-2 w-6 h-6" />
               </button>
             </div>
           </div>
@@ -688,38 +654,35 @@
       }
 
       if (screen === 'learn') {
-        const currentItem = currentLearnItems[learnIndex];
-        const isVocab = currentItem.type === 'vocab';
+        if (!learnItems || !learnItems[learnIndex]) return null;
+        const currentItem = learnItems[learnIndex];
+        const isVocab = !!currentItem.word;
         
-        const mainText = isVocab ? currentItem.data.word : (kanaType === 'katakana' ? currentItem.data.k : currentItem.data.h);
-        const subText = isVocab ? currentItem.data.meaning : currentItem.data.r;
-        const rowLabelText = isVocab ? '綜合單字' : (kanaType === 'katakana' ? currentItem.data.rowLabelK : currentItem.data.rowLabelH);
-
-        const handleNextLearn = () => {
-          if (learnIndex < currentLearnItems.length - 1) {
-            const nextIdx = learnIndex + 1;
-            setLearnIndex(nextIdx);
-            const nextItem = currentLearnItems[nextIdx];
-            if (nextItem.type === 'vocab') playAudio(nextItem.data.word);
-            else playAudio(kanaType === 'katakana' ? nextItem.data.k : nextItem.data.h);
-          } else {
-            proceedToQuiz();
-          }
-        };
-
-        const handlePrevLearn = () => {
-          if (learnIndex > 0) {
-            const prevIdx = learnIndex - 1;
-            setLearnIndex(prevIdx);
-            const prevItem = currentLearnItems[prevIdx];
-            if (prevItem.type === 'vocab') playAudio(prevItem.data.word);
-            else playAudio(kanaType === 'katakana' ? prevItem.data.k : prevItem.data.h);
-          }
-        };
+        const mainText = isVocab ? (kanaType === 'katakana' ? convertToKatakanaVocab(currentItem.wordH) : currentItem.wordH) : (kanaType === 'katakana' ? currentItem.k : currentItem.h);
+        const subText = isVocab ? currentItem.meaning : currentItem.r;
+        
+        const activeRowId = selectedRows[currentRowIndex];
+        const rowData = GOJUON_DATA.find(r => r.id === activeRowId);
+        const rowLabelText = isVocab ? '相關單字' : (kanaType === 'katakana' ? rowData.labelK : rowData.labelH);
 
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-lg">
+              <div className="flex gap-1.5 justify-center mb-4">
+                {selectedRows.map((rowId, idx) => {
+                  const rData = GOJUON_DATA.find(r => r.id === rowId);
+                  const isActive = idx === currentRowIndex;
+                  const isPassed = idx < currentRowIndex;
+                  return (
+                    <span 
+                      key={rowId} 
+                      className={`h-2 rounded-full transition-all duration-300 ${isActive ? 'w-8 bg-indigo-600' : isPassed ? 'w-3 bg-emerald-500' : 'w-2 bg-slate-200'}`}
+                      title={rData ? (kanaType === 'katakana' ? rData.labelK : rData.labelH) : ''}
+                    />
+                  );
+                })}
+              </div>
+
               <div className="flex justify-between items-center mb-6 px-2">
                 <button 
                   onClick={() => {
@@ -731,32 +694,34 @@
                 >
                   <ArrowLeft className="w-6 h-6" />
                 </button>
-                <span className="text-slate-500 font-bold tracking-wide text-sm bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm">
-                  學習字卡: {learnIndex + 1} / {currentLearnItems.length}
+                <span className="text-slate-500 font-bold tracking-wide text-sm bg-white px-3 py-1 rounded-full border border-slate-200">
+                  學習字卡: {learnIndex + 1} / {learnItems.length}
                 </span>
                 <button 
                   onClick={proceedToQuiz}
-                  className="flex items-center text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100 px-4 py-1.5 rounded-full text-sm transition-colors shadow-sm"
-                  title="跳過剩下的字卡，直接開始測驗"
+                  className="flex items-center text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100 px-4 py-1.5 rounded-full text-sm transition-colors"
                 >
                   直接測驗 <SkipForward className="ml-1 w-4 h-4" />
                 </button>
               </div>
 
               <div className="bg-white rounded-[2rem] shadow-xl p-10 md:p-14 mb-8 border border-slate-100 flex flex-col items-center relative text-center">
-                 <p className="text-sm text-indigo-500 mb-4 font-bold tracking-widest bg-indigo-50 px-4 py-1 rounded-full">
+                 <p className="text-sm text-indigo-600 mb-4 font-bold tracking-widest bg-indigo-50 px-4 py-1 rounded-full">
                    — {rowLabelText} 學習 —
                  </p>
                  <h2 className="text-7xl md:text-8xl font-black text-slate-800 mb-6 tracking-wider">
                    {mainText}
                  </h2>
-                 <p className="text-3xl text-indigo-600 font-bold">
+                 <p className="text-2xl text-indigo-600 font-bold">
                    {subText}
                  </p>
                  
                  <button 
-                   onClick={() => playAudio(isVocab ? currentItem.data.word : (kanaType === 'katakana' ? currentItem.data.k : currentItem.data.h))}
-                   className="mt-8 p-5 bg-slate-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors shadow-sm border border-slate-100"
+                   onClick={() => {
+                     const pronunciation = isVocab ? (kanaType === 'katakana' ? convertToKatakanaVocab(currentItem.wordH) : currentItem.wordH) : (kanaType === 'katakana' ? currentItem.k : currentItem.h);
+                     playAudio(pronunciation);
+                   }}
+                   className="mt-8 p-4 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors shadow-sm"
                    title="播放發音"
                  >
                    <Volume2 className="w-8 h-8" />
@@ -765,17 +730,33 @@
 
               <div className="flex gap-4">
                 <button
-                  onClick={handlePrevLearn}
+                  onClick={() => {
+                    const prevIdx = learnIndex - 1;
+                    setLearnIndex(prevIdx);
+                    const prevTarget = learnItems[prevIdx];
+                    const pron = prevTarget.word ? (kanaType === 'katakana' ? convertToKatakanaVocab(prevTarget.wordH) : prevTarget.wordH) : (kanaType === 'katakana' ? prevTarget.k : prevTarget.h);
+                    playAudio(pron);
+                  }}
                   disabled={learnIndex === 0}
                   className="flex-1 py-4 bg-white text-slate-600 border-2 border-slate-200 rounded-2xl font-bold text-lg hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-sm"
                 >
                   <ChevronLeft className="mr-2 w-6 h-6" /> 上一張
                 </button>
                 <button
-                  onClick={handleNextLearn}
+                  onClick={() => {
+                    if (learnIndex < learnItems.length - 1) {
+                      const nextIdx = learnIndex + 1;
+                      setLearnIndex(nextIdx);
+                      const nextTarget = learnItems[nextIdx];
+                      const pron = nextTarget.word ? (kanaType === 'katakana' ? convertToKatakanaVocab(nextTarget.wordH) : nextTarget.wordH) : (kanaType === 'katakana' ? nextTarget.k : nextTarget.h);
+                      playAudio(pron);
+                    } else {
+                      proceedToQuiz();
+                    }
+                  }}
                   className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-colors shadow-md flex items-center justify-center"
                 >
-                  {learnIndex === currentLearnItems.length - 1 ? (
+                  {learnIndex === learnItems.length - 1 ? (
                     <>進入測驗 <ArrowRight className="ml-2 w-6 h-6" /></>
                   ) : (
                     <>下一張 <ChevronRight className="ml-2 w-6 h-6" /></>
@@ -788,29 +769,29 @@
       }
 
       if (screen === 'quiz') {
-        const currentQ = currentQuestions[quizIndex];
+        if (!questions || !questions[currentIndex]) return null;
+        const currentQ = questions[currentIndex];
+        const isVocab = currentQ.type === 'vocab';
         
         const renderQuestion = () => {
-          if (currentQ.type === 'vocab') {
+          if (isVocab) {
             return (
               <div className="text-center">
-                <p className="text-sm text-emerald-600 font-bold mb-2 tracking-widest bg-emerald-50 px-3 py-1 rounded-full inline-block">單字題</p>
-                <p className="text-sm text-slate-500 mb-2 font-medium mt-2">請選出下列中文對應的日文</p>
+                <p className="text-sm text-slate-500 mb-2 font-medium">請選出下列中文對應的日文發音</p>
                 <h2 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4">{currentQ.target.meaning}</h2>
               </div>
             );
           }
           
-          const isRomajiQ = currentQ.type === 'romajiToKana';
+          const isRomajiQ = currentQ.format === 'romajiToKana';
           const questionText = isRomajiQ 
             ? currentQ.target.r 
             : (kanaType === 'katakana' ? currentQ.target.k : currentQ.target.h);
 
           return (
             <div className="text-center">
-              <p className="text-sm text-indigo-500 font-bold mb-2 tracking-widest bg-indigo-50 px-3 py-1 rounded-full inline-block">發音題</p>
-              <p className="text-sm text-slate-500 mb-2 font-medium mt-2">
-                {isRomajiQ ? '請選出正確的假名' : '請選出正確的羅馬拼音'}
+              <p className="text-sm text-slate-500 mb-2 font-medium">
+                {isRomajiQ ? '請選出正確的假名' : '請選出正確的發音'}
               </p>
               <h2 className="text-7xl md:text-8xl font-black text-slate-800 mb-4 tracking-wider">{questionText}</h2>
             </div>
@@ -818,26 +799,16 @@
         };
 
         const renderOptionText = (opt) => {
-          if (currentQ.type === 'vocab') return opt.word;
-          if (currentQ.type === 'kanaToRomaji') return opt.r;
+          if (isVocab) return kanaType === 'katakana' ? convertToKatakanaVocab(opt.wordH) : opt.wordH;
+          if (currentQ.format === 'kanaToRomaji') return opt.r;
           return kanaType === 'katakana' ? opt.k : opt.h;
         };
 
-        const showAudioButton = isAnswered || (currentQ.type === 'vocab' && vocabAutoPlay);
-        
-        // 取得目前正在測驗的行別標籤
-        const currentRowId = selectedRows[activeRowIndex];
-        const rowData = GOJUON_DATA.find(r => r.id === currentRowId);
-        const rowLabelText = kanaType === 'katakana' ? rowData.labelK : rowData.labelH;
+        const showAudioButton = isAnswered || (isVocab && vocabAutoPlay);
 
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-lg">
-              <div className="text-center mb-4">
-                <span className="text-slate-400 font-bold tracking-widest">
-                  — 目前進度：{rowLabelText} ({activeRowIndex + 1}/{selectedRows.length}) —
-                </span>
-              </div>
               <div className="flex justify-between items-center mb-6 px-2">
                 <button 
                   onClick={() => {
@@ -845,15 +816,15 @@
                     setScreen('setup'); 
                   }}
                   className="flex items-center justify-center p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
-                  title="中斷測驗並回設定"
+                  title="結束測驗並回設定"
                 >
                   <ArrowLeft className="w-6 h-6" />
                 </button>
-                <span className="text-slate-500 font-bold tracking-wide text-sm bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm">
-                  題號: {quizIndex + 1} / {currentQuestions.length}
+                <span className="text-slate-500 font-bold tracking-wide text-sm bg-white px-3 py-1 rounded-full border border-slate-200">
+                  測驗進度: {currentIndex + 1} / {questions.length}
                 </span>
-                <span className="text-indigo-600 font-bold bg-indigo-50 px-4 py-1 rounded-full text-sm shadow-sm">
-                  本行得分: {score}
+                <span className="text-indigo-600 font-bold bg-indigo-50 px-4 py-1 rounded-full text-sm">
+                  得分: {rowScore}
                 </span>
               </div>
 
@@ -862,10 +833,14 @@
                 
                 <button 
                   onClick={() => {
-                    if (currentQ.type === 'vocab') playAudio(currentQ.target.word);
-                    else playAudio(kanaType === 'katakana' ? currentQ.target.k : currentQ.target.h);
+                    if (isVocab) {
+                      const pronunciation = kanaType === 'katakana' ? convertToKatakanaVocab(currentQ.target.wordH) : currentQ.target.wordH;
+                      playAudio(pronunciation);
+                    } else {
+                      playAudio(kanaType === 'katakana' ? currentQ.target.k : currentQ.target.h);
+                    }
                   }}
-                  className={`p-4 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors mt-6 shadow-sm border border-indigo-100 ${!showAudioButton ? 'invisible' : 'visible'}`}
+                  className={`p-4 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors mt-6 shadow-sm ${!showAudioButton ? 'invisible' : 'visible'}`}
                   title="播放發音"
                 >
                   <Volume2 className="w-7 h-7" />
@@ -875,7 +850,7 @@
               <div className="grid grid-cols-2 gap-4">
                 {currentQ.options.map((opt, i) => {
                   let isCorrectAnswer = false;
-                  if (currentQ.type === 'vocab') {
+                  if (isVocab) {
                      isCorrectAnswer = opt.word === currentQ.target.word;
                   } else {
                      isCorrectAnswer = opt.r === currentQ.target.r;
@@ -900,7 +875,7 @@
                       onClick={() => handleAnswer(opt)}
                       className={`
                         py-6 px-4 rounded-[1.5rem] border-2 text-2xl md:text-3xl font-bold transition-all duration-200 
-                        flex items-center justify-center relative shadow-sm
+                        flex items-center justify-center relative
                         ${btnStyle}
                       `}
                     >
@@ -920,20 +895,82 @@
         );
       }
 
-      if (screen === 'result') {
-        const totalScore = rowResults.reduce((acc, curr) => acc + curr.score, 0);
-        const totalQuestions = rowResults.reduce((acc, curr) => acc + curr.total, 0);
-        const percentage = totalQuestions > 0 ? Math.round((totalScore / totalQuestions) * 100) : 0;
-        
+      if (screen === 'transition') {
+        const lastResult = rowResults[rowResults.length - 1];
+        const nextIndex = currentRowIndex + 1;
+        const hasNext = nextIndex < selectedRows.length;
+        const nextRowId = hasNext ? selectedRows[nextIndex] : null;
+        const nextRowData = hasNext ? GOJUON_DATA.find(r => r.id === nextRowId) : null;
+        const nextRowLabel = nextRowData ? (kanaType === 'katakana' ? nextRowData.labelK : nextRowData.labelH) : '';
+
+        const scorePercentage = lastResult ? (lastResult.score / lastResult.total) : 0;
+        let evaluation = "加油！多複習幾次就會更熟練囉！🌟";
+        if (scorePercentage === 1) evaluation = "太厲害了！完美全對！💯";
+        else if (scorePercentage >= 0.8) evaluation = "表現優異！手感火熱喔！🔥";
+        else if (scorePercentage >= 0.6) evaluation = "表現不錯！及格囉！👍";
+
         return (
-          <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 py-8">
+          <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+            <div className="bg-white max-w-md w-full rounded-[2rem] shadow-xl p-10 text-center border border-slate-100">
+              <span className="text-xs uppercase tracking-widest text-indigo-500 font-black bg-indigo-50 px-3 py-1 rounded-full">
+                關卡挑戰完成
+              </span>
+              <h2 className="text-3xl font-extrabold text-slate-900 mt-4 mb-2">
+                {lastResult?.label} 通關！
+              </h2>
+              <p className="text-slate-500 font-medium mb-6">{evaluation}</p>
+
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 mb-8">
+                <span className="text-sm font-bold text-slate-400 block mb-1">本行測驗得分</span>
+                <span className="text-4xl font-black text-slate-800">
+                  {lastResult?.score} <span className="text-2xl text-slate-400">/ {lastResult?.total}</span>
+                </span>
+              </div>
+
+              <button
+                onClick={handleNextRow}
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-colors shadow-md flex items-center justify-center"
+              >
+                {hasNext ? (
+                  <>進入下一行：{nextRowLabel} <ArrowRight className="ml-2 w-5 h-5" /></>
+                ) : (
+                  <>查看最終總成果 <ArrowRight className="ml-2 w-5 h-5" /></>
+                )}
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      if (screen === 'result') {
+        const totalCorrect = rowResults.reduce((acc, r) => acc + r.score, 0);
+        const totalQuestions = rowResults.reduce((acc, r) => acc + r.total, 0);
+        const percentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+
+        return (
+          <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
             <div className="bg-white max-w-lg w-full rounded-[2rem] shadow-xl p-8 md:p-10 text-center border border-slate-100">
-              <h2 className="text-3xl font-bold text-slate-900 mb-2">全部測驗完成！</h2>
-              <p className="text-slate-500 mb-8 font-medium">您選擇的 {selectedRows.length} 個範圍皆已複習完畢</p>
+              <h2 className="text-3xl font-bold text-slate-900 mb-2">全部複習完成！</h2>
+              <p className="text-slate-500 mb-8 font-medium">您今天非常努力喔，來看看各行成績單：</p>
               
-              <div className={`w-36 h-36 mx-auto rounded-full border-[10px] flex flex-col items-center justify-center mb-8 shadow-inner
+              <div className={`w-36 h-36 mx-auto rounded-full border-[10px] flex items-center justify-center mb-8 shadow-inner
                 ${percentage >= 80 ? 'border-emerald-500 text-emerald-500' : percentage >= 60 ? 'border-yellow-500 text-yellow-500' : 'border-red-500 text-red-500'}`}>
-                <span className="text-5xl font-black leading-none">{percentage}%</span>
+                <span className="text-5xl font-black">{percentage}%</span>
+              </div>
+
+              <div className="space-y-3 max-h-60 overflow-y-auto border border-slate-100 rounded-2xl p-4 bg-slate-50/50 mb-8">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-left mb-1">各行學習成績單</p>
+                {rowResults.map((res, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-sm font-medium py-1.5 border-b border-slate-100 last:border-0">
+                    <span className="text-slate-700">{res.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500">{res.score} / {res.total} 答對</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${res.score === res.total ? 'bg-emerald-100 text-emerald-700' : res.score >= res.total * 0.8 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {Math.round((res.score / res.total) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-8">
@@ -943,26 +980,7 @@
                 </div>
                 <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
                   <p className="text-sm font-bold text-indigo-400 mb-1">總答對題數</p>
-                  <p className="text-3xl font-black text-indigo-600">{totalScore}</p>
-                </div>
-              </div>
-
-              <div className="text-left mb-8">
-                <h3 className="text-lg font-bold text-slate-700 mb-3 px-2">各行學習狀況</h3>
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                  {rowResults.map((result, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="font-bold text-slate-700">{result.rowName}</span>
-                      <div className="flex items-center">
-                        <span className="font-bold text-indigo-600 mr-2">{result.score} / {result.total}</span>
-                        {result.score === result.total ? (
-                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-bold">完美</span>
-                        ) : (
-                          <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded-full font-bold">待加強</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  <p className="text-3xl font-black text-indigo-600">{totalCorrect}</p>
                 </div>
               </div>
 
@@ -982,13 +1000,6 @@
                 </button>
               </div>
             </div>
-            
-            <style dangerouslySetInnerHTML={{__html: `
-              .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-              .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
-              .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-              .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-            `}} />
           </div>
         );
       }
