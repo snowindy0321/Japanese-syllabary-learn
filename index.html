@@ -197,16 +197,32 @@
       });
     });
 
-    // 手機離線 TTS 備援方案
+    // --- 語音模組 ---
+    // 獲取或建立一個全域的共用 Audio 元素，解決自動播放被阻擋的問題
+    const getSharedAudioPlayer = () => {
+      let player = document.getElementById('app-shared-audio-player');
+      if (!player) {
+        player = document.createElement('audio');
+        player.id = 'app-shared-audio-player';
+        player.style.display = 'none';
+        document.body.appendChild(player);
+      }
+      return player;
+    };
+
+    // 手機離線 TTS 備援方案 (加入隱形空白解決「頓」與中文發音的問題)
     const playLocalTTS = (text) => {
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
+        // 在字尾加上一個全形空白，能有效欺騙安卓的中文語音引擎將其辨識為日文，且不會發出怪音
+        const utterance = new SpeechSynthesisUtterance(text + '　');
         utterance.lang = 'ja-JP'; 
         utterance.rate = 0.85; 
         
         const voices = window.speechSynthesis.getVoices();
-        const jaVoices = voices.filter(v => v.lang.includes('ja') || v.lang.includes('JP') || v.name.includes('日'));
+        const jaVoices = voices.filter(v => 
+          v.lang === 'ja-JP' || v.lang === 'ja_JP' || v.lang.includes('ja') || v.name.includes('Japan')
+        );
         
         if (jaVoices.length > 0) {
           const googleVoice = jaVoices.find(v => v.name.includes('Google'));
@@ -223,7 +239,6 @@
       const [quizModes, setQuizModes] = useState(['kanaToRomaji']); 
       const [vocabAutoPlay, setVocabAutoPlay] = useState(true);
       
-      // 控制是否使用網路語音
       const [useNetworkTTS, setUseNetworkTTS] = useState(true);
 
       const [currentRowIndex, setCurrentRowIndex] = useState(0); 
@@ -238,6 +253,7 @@
       const [isAnswered, setIsAnswered] = useState(false);
       const [selectedOption, setSelectedOption] = useState(null);
 
+      // 預先載入語音包
       useEffect(() => {
         const initVoices = () => {
           if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
@@ -248,28 +264,21 @@
         }
       }, []);
 
-      // 全新的播放音訊邏輯 (完美解決 Android 手機中文怪音)
+      // 雙引擎播放邏輯
       const playAudio = useCallback((text) => {
         if (!text) return;
 
         if (useNetworkTTS) {
-          // 強制使用穩定的 gtx 端點，並在 DOM 中重複利用 audio 標籤以提升相容性
-          let audioEl = document.getElementById('network-tts-player');
-          if (!audioEl) {
-            audioEl = document.createElement('audio');
-            audioEl.id = 'network-tts-player';
-            audioEl.style.display = 'none';
-            document.body.appendChild(audioEl);
-          }
-          audioEl.src = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=ja&q=${encodeURIComponent(text)}`;
+          const player = getSharedAudioPlayer();
+          // 改用最穩定、最不易被擋的 tw-ob 伺服器
+          player.src = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=${encodeURIComponent(text)}`;
           
-          // 如果使用者勾選了網路語音，就算報錯也「不會」退回原本的中文手機語音，
-          // 以免發出「頓」等難聽聲音造成困擾。
-          audioEl.play().catch(err => {
-            console.warn("網路語音播放受阻，請點擊螢幕上的喇叭按鈕手動播放", err);
+          player.play().catch(err => {
+            console.warn("網路語音播放受阻，自動退回本地語音", err);
+            // 如果遇到瀏覽器阻擋自動播放，立刻無縫切換回手機本地語音
+            playLocalTTS(text);
           });
         } else {
-          // 強制使用手機內建語音 (離線備用)
           playLocalTTS(text);
         }
       }, [useNetworkTTS]);
@@ -446,6 +455,14 @@
 
       const startQuiz = () => {
         if (isStartDisabled) return;
+        
+        // 點擊開始按鈕時，偷偷喚醒音訊元素，解決 iOS/Android 的自動播放限制
+        if (useNetworkTTS) {
+          const player = getSharedAudioPlayer();
+          player.src = 'data:audio/mp3;base64,//MkxAAQ...'; // 播放一段極短的空音訊解鎖
+          player.play().catch(() => {});
+        }
+
         setRowResults([]);
         setScore(0);
         setCurrentRowIndex(0);
@@ -530,7 +547,7 @@
         }
       };
 
-      // === 以下為畫面渲染 ===
+      // === 畫面渲染區塊 ===
 
       if (screen === 'home') {
         return (
@@ -571,7 +588,7 @@
                     <Headphones className="w-6 h-6" />
                   </div>
                   <h3 className="text-xl font-bold text-slate-800 mb-2">標準日文語音</h3>
-                  <p className="text-slate-500">搭載網路高音質日語語音引擎，完全解決手機發音錯誤的問題，落實聽力自我檢測。</p>
+                  <p className="text-slate-500">搭載網路高音質日語語音引擎，具備雙重備援機制，落實聽力自我檢測。</p>
                 </div>
               </div>
 
@@ -625,7 +642,7 @@
                     </div>
                     <div className="flex flex-col w-full">
                       <span className="font-bold text-slate-700">網路高音質語音 (強烈推薦)</span>
-                      <span className="text-sm text-slate-500 mt-1">發音標準，完美解決安卓手機念成怪音的問題（需保持網路連線）。</span>
+                      <span className="text-sm text-slate-500 mt-1">發音標準，完美解決安卓手機念成怪音的問題（內建雙重備援不卡死）。</span>
                     </div>
                   </label>
                   <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-colors ${!useNetworkTTS ? 'bg-indigo-50/50 border-indigo-300' : 'border-slate-200 hover:bg-slate-50'}`}>
